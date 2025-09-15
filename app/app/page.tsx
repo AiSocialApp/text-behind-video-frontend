@@ -37,6 +37,11 @@ const Page = () => {
     const [isPayDialogOpen, setIsPayDialogOpen] = useState<boolean>(false); 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const stageRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [previewScale, setPreviewScale] = useState<number>(1);
 
     const getCurrentUser = async () => {
         if (!profile) return;
@@ -70,6 +75,14 @@ const Page = () => {
         const file = event.target.files?.[0];
         if (file) {
             const imageUrl = URL.createObjectURL(file);
+            await new Promise<void>((resolve) => {
+                const img = new (window as any).Image();
+                img.onload = () => {
+                    setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+                    resolve();
+                };
+                img.src = imageUrl;
+            });
             setSelectedImage(imageUrl);
             await setupImage(imageUrl);
         }
@@ -90,6 +103,27 @@ const Page = () => {
         }
     };
 
+    const updatePreviewScale = () => {
+        if (!containerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+        const scale = Math.min(containerWidth / imageNaturalSize.width, containerHeight / imageNaturalSize.height);
+        setPreviewScale(scale || 1);
+    };
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const ResizeObs = (window as any).ResizeObserver || (window as any).WebKitResizeObserver || (window as any).MozResizeObserver;
+        if (!ResizeObs) return;
+        const ro = new ResizeObs(() => updatePreviewScale());
+        ro.observe(containerRef.current);
+        updatePreviewScale();
+        return () => {
+            try { ro.disconnect(); } catch {}
+        };
+    }, [imageNaturalSize.width, imageNaturalSize.height]);
+
     const addNewTextSet = () => {
         const newId = Math.max(...textSets.map(set => set.id), 0) + 1;
         setTextSets(prev => [...prev, {
@@ -99,7 +133,7 @@ const Page = () => {
             top: 0,
             left: 0,
             color: 'white',
-            fontSize: 200,
+            fontSize: 300,
             fontWeight: 800,
             opacity: 1,
             shadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -146,12 +180,13 @@ const Page = () => {
                 ctx.save();
                 
                 // Set up text properties
-                ctx.font = `${textSet.fontWeight} ${textSet.fontSize * 3}px ${textSet.fontFamily}`;
+                const fontSizePx = textSet.fontSize;
+                ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
                 ctx.fillStyle = textSet.color;
                 ctx.globalAlpha = textSet.opacity;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.letterSpacing = `${textSet.letterSpacing}px`;
+                // letterSpacing handled manually below
     
                 const x = canvas.width * (textSet.left + 50) / 100;
                 const y = canvas.height * (50 - textSet.top) / 100;
@@ -175,32 +210,73 @@ const Page = () => {
     
                 // Apply rotation last
                 ctx.rotate((textSet.rotation * Math.PI) / 180);
-    
-                if (textSet.letterSpacing === 0) {
-                    // Use standard text rendering if no letter spacing
-                    ctx.fillText(textSet.text, 0, 0);
-                } else {
-                    // Manual letter spacing implementation
-                    const chars = textSet.text.split('');
-                    let currentX = 0;
-                    // Calculate total width to center properly
-                    const totalWidth = chars.reduce((width, char, i) => {
-                        const charWidth = ctx.measureText(char).width;
-                        return width + charWidth + (i < chars.length - 1 ? textSet.letterSpacing : 0);
-                    }, 0);
-                    
 
-                
-                    // Start position (centered)
-                    currentX = -totalWidth / 2;
-                    
-                    // Draw each character with spacing
-                    chars.forEach((char, i) => {
-                        const charWidth = ctx.measureText(char).width;
-                        ctx.fillText(char, currentX + charWidth / 2, 0);
-                        currentX += charWidth + textSet.letterSpacing;
+                const letterSpacingPx = textSet.letterSpacing || 0;
+                const maxLineWidthPx = canvas.width * ((textSet.boxWidth ?? 80) / 100);
+                const lineHeightPx = fontSizePx * (textSet.lineHeight ?? 1.2);
+
+                const computeLineWidth = (lineText: string) => {
+                    const metricsWidth = ctx.measureText(lineText).width;
+                    const extra = Math.max(0, (lineText.length - 1)) * letterSpacingPx;
+                    return metricsWidth + extra;
+                };
+
+                const wrapText = (fullText: string) => {
+                    const paragraphs: string[] = fullText.split('\n');
+                    const lines: string[] = [];
+                    paragraphs.forEach((para) => {
+                        const words: string[] = para.split(' ');
+                        let current = '';
+                        for (let i = 0; i < words.length; i++) {
+                            const test = current ? current + ' ' + words[i] : words[i];
+                            if (computeLineWidth(test) <= maxLineWidthPx) {
+                                current = test;
+                            } else {
+                                if (current) lines.push(current);
+                                // hard-break long words by characters
+                                if (computeLineWidth(words[i]) > maxLineWidthPx) {
+                                    let chunk = '';
+                                    for (const ch of words[i]) {
+                                        const testChunk = chunk + ch;
+                                        if (computeLineWidth(testChunk) <= maxLineWidthPx) {
+                                            chunk = testChunk;
+                                        } else {
+                                            if (chunk) lines.push(chunk);
+                                            chunk = ch as string;
+                                        }
+                                    }
+                                    current = chunk;
+                                } else {
+                                    current = words[i];
+                                }
+                            }
+                        }
+                        if (current) lines.push(current);
                     });
-                }
+                    return lines;
+                };
+
+                const lines = wrapText(textSet.text);
+                const totalHeight = lines.length * lineHeightPx;
+
+                lines.forEach((line, idx) => {
+                    const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
+                    if (letterSpacingPx === 0) {
+                        ctx.fillText(line, 0, lineY);
+                    } else {
+                        const chars: string[] = line.split('');
+                        const totalWidth = chars.reduce((width, char, i) => {
+                            const charWidth = ctx.measureText(char).width;
+                            return width + charWidth + (i < chars.length - 1 ? letterSpacingPx : 0);
+                        }, 0);
+                        let currentX = -totalWidth / 2;
+                        chars.forEach((char: string) => {
+                            const charWidth = ctx.measureText(char).width;
+                            ctx.fillText(char, currentX + charWidth / 2, lineY);
+                            currentX += charWidth + letterSpacingPx;
+                        });
+                    }
+                });
                 ctx.restore();
             });
     
@@ -344,7 +420,7 @@ const Page = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="min-h-[400px] w-[80%] p-4 border border-border rounded-lg relative overflow-hidden">
+                                <div ref={containerRef} className="min-h-[400px] w-[80%] p-4 border border-border rounded-lg relative overflow-hidden">
                                     {isImageSetupDone ? (
                                         <Image
                                             src={selectedImage} 
@@ -356,38 +432,40 @@ const Page = () => {
                                     ) : (
                                         <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
                                     )}
-                                    {isImageSetupDone && textSets.map(textSet => (
-                                        <div
-                                            key={textSet.id}
-                                            style={{
-                                                position: 'absolute',
-                                                top: `${50 - textSet.top}%`,
-                                                left: `${textSet.left + 50}%`,
-                                                transform: `
-                                                    translate(-50%, -50%) 
-                                                    rotate(${textSet.rotation}deg)
-                                                    perspective(1000px)
-                                                    rotateX(${textSet.tiltX}deg)
-                                                    rotateY(${textSet.tiltY}deg)
-                                                `,
-                                                color: textSet.color,
-                                                textAlign: 'center',
-                                                fontSize: `${textSet.fontSize}px`,
-                                                fontWeight: textSet.fontWeight,
-                                                fontFamily: textSet.fontFamily,
-                                                opacity: textSet.opacity,
-                                                letterSpacing: `${textSet.letterSpacing}px`,
-                                                transformStyle: 'preserve-3d',
-                                                width: `${textSet.boxWidth ?? 80}%`,
-                                                maxWidth: '100%',
-                                                whiteSpace: 'pre-wrap',
-                                                overflowWrap: 'anywhere',
-                                                lineHeight: textSet.lineHeight ?? 1.2
-                                            }}
-                                        >
-                                            {textSet.text}
-                                        </div>
-                                    ))}
+                                    <div ref={stageRef} className="absolute inset-4">
+                                        {isImageSetupDone && textSets.map(textSet => (
+                                            <div
+                                                key={textSet.id}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: `${50 - textSet.top}%`,
+                                                    left: `${textSet.left + 50}%`,
+                                                    transform: `
+                                                        translate(-50%, -50%) 
+                                                        rotate(${textSet.rotation}deg)
+                                                        perspective(1000px)
+                                                        rotateX(${textSet.tiltX}deg)
+                                                        rotateY(${textSet.tiltY}deg)
+                                                    `,
+                                                    color: textSet.color,
+                                                    textAlign: 'center',
+                                                    fontSize: `${textSet.fontSize * previewScale}px`,
+                                                    fontWeight: textSet.fontWeight,
+                                                    fontFamily: textSet.fontFamily,
+                                                    opacity: textSet.opacity,
+                                                    letterSpacing: `${(textSet.letterSpacing || 0) * previewScale}px`,
+                                                    transformStyle: 'preserve-3d',
+                                                    width: `${textSet.boxWidth ?? 80}%`,
+                                                    maxWidth: '100%',
+                                                    whiteSpace: 'pre-wrap',
+                                                    overflowWrap: 'anywhere',
+                                                    lineHeight: textSet.lineHeight ?? 1.2
+                                                }}
+                                            >
+                                                {textSet.text}
+                                            </div>
+                                        ))}
+                                    </div>
                                     {removedBgImageUrl && (
                                         <Image
                                             src={removedBgImageUrl}
