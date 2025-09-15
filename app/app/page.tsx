@@ -39,9 +39,14 @@ const Page = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const stageRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+    const bgImageRef = useRef<HTMLImageElement | null>(null);
+    const removedBgImageRef = useRef<HTMLImageElement | null>(null);
+    const outerRef = useRef<HTMLDivElement>(null);
 
     const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
     const [previewScale, setPreviewScale] = useState<number>(1);
+    const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
     const getCurrentUser = async () => {
         if (!profile) return;
@@ -74,6 +79,11 @@ const Page = () => {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+            // Clear foreground cutout immediately
+            removedBgImageRef.current = null;
+            setRemovedBgImageUrl(null);
+            setIsImageSetupDone(false);
+
             const imageUrl = URL.createObjectURL(file);
             await new Promise<void>((resolve) => {
                 const img = new (window as any).Image();
@@ -104,25 +114,191 @@ const Page = () => {
     };
 
     const updatePreviewScale = () => {
-        if (!containerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const containerWidth = rect.width;
-        const containerHeight = rect.height;
-        const scale = Math.min(containerWidth / imageNaturalSize.width, containerHeight / imageNaturalSize.height);
+        if (!outerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
+        const rect = outerRef.current.getBoundingClientRect();
+        const availableWidth = rect.width * 0.8; // container is w-[80%]
+        const scale = availableWidth / imageNaturalSize.width;
+        const targetWidth = Math.max(1, Math.floor(imageNaturalSize.width * scale));
+        const targetHeight = Math.max(1, Math.floor(imageNaturalSize.height * scale));
         setPreviewScale(scale || 1);
+        setDisplayedSize({ width: targetWidth, height: targetHeight });
     };
 
     useEffect(() => {
-        if (!containerRef.current) return;
-        const ResizeObs = (window as any).ResizeObserver || (window as any).WebKitResizeObserver || (window as any).MozResizeObserver;
-        if (!ResizeObs) return;
-        const ro = new ResizeObs(() => updatePreviewScale());
-        ro.observe(containerRef.current);
+        const onResize = () => updatePreviewScale();
+        window.addEventListener('resize', onResize);
         updatePreviewScale();
         return () => {
-            try { ro.disconnect(); } catch {}
+            window.removeEventListener('resize', onResize);
         };
     }, [imageNaturalSize.width, imageNaturalSize.height]);
+
+    // Load background image element
+    useEffect(() => {
+        if (!selectedImage) return;
+        const img = new (window as any).Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            bgImageRef.current = img;
+            // Redraw after image load
+            if (previewCanvasRef.current && displayedSize.width && displayedSize.height) {
+                drawPreview();
+            }
+        };
+        img.src = selectedImage;
+        return () => {
+            // no special cleanup
+        };
+    }, [selectedImage]);
+
+    // Load removed background image element
+    useEffect(() => {
+        if (!removedBgImageUrl) {
+            removedBgImageRef.current = null;
+            if (previewCanvasRef.current && displayedSize.width && displayedSize.height) {
+                drawPreview();
+            }
+            return;
+        }
+        const img = new (window as any).Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            removedBgImageRef.current = img;
+            if (previewCanvasRef.current && displayedSize.width && displayedSize.height) {
+                drawPreview();
+            }
+        };
+        img.src = removedBgImageUrl;
+        return () => {
+            // no special cleanup
+        };
+    }, [removedBgImageUrl]);
+
+    const drawTextSets = (ctx: CanvasRenderingContext2D, targetWidth: number, targetHeight: number, scaleForFont: number) => {
+        textSets.forEach(textSet => {
+            ctx.save();
+            const fontSizePx = textSet.fontSize * scaleForFont;
+            ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
+            ctx.fillStyle = textSet.color;
+            ctx.globalAlpha = textSet.opacity;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const x = targetWidth * (textSet.left + 50) / 100;
+            const y = targetHeight * (50 - textSet.top) / 100;
+            ctx.translate(x, y);
+
+            const tiltXRad = (-textSet.tiltX * Math.PI) / 180;
+            const tiltYRad = (-textSet.tiltY * Math.PI) / 180;
+            ctx.transform(
+                Math.cos(tiltYRad),
+                Math.sin(0),
+                -Math.sin(0),
+                Math.cos(tiltXRad),
+                0,
+                0
+            );
+            ctx.rotate((textSet.rotation * Math.PI) / 180);
+
+            const letterSpacingPx = (textSet.letterSpacing || 0) * scaleForFont;
+            const maxLineWidthPx = targetWidth * ((textSet.boxWidth ?? 80) / 100);
+            const lineHeightPx = fontSizePx * (textSet.lineHeight ?? 1.2);
+
+            const computeLineWidth = (lineText: string) => {
+                const metricsWidth = ctx.measureText(lineText).width;
+                const extra = Math.max(0, (lineText.length - 1)) * letterSpacingPx;
+                return metricsWidth + extra;
+            };
+
+            const wrapText = (fullText: string) => {
+                const paragraphs: string[] = fullText.split('\n');
+                const lines: string[] = [];
+                paragraphs.forEach((para) => {
+                    const words: string[] = para.split(' ');
+                    let current = '';
+                    for (let i = 0; i < words.length; i++) {
+                        const test = current ? current + ' ' + words[i] : words[i];
+                        if (computeLineWidth(test) <= maxLineWidthPx) {
+                            current = test;
+                        } else {
+                            if (current) lines.push(current);
+                            if (computeLineWidth(words[i]) > maxLineWidthPx) {
+                                let chunk = '';
+                                for (const ch of words[i]) {
+                                    const testChunk = chunk + ch;
+                                    if (computeLineWidth(testChunk) <= maxLineWidthPx) {
+                                        chunk = testChunk;
+                                    } else {
+                                        if (chunk) lines.push(chunk);
+                                        chunk = ch as string;
+                                    }
+                                }
+                                current = chunk;
+                            } else {
+                                current = words[i];
+                            }
+                        }
+                    }
+                    if (current) lines.push(current);
+                });
+                return lines;
+            };
+
+            const lines = wrapText(textSet.text);
+            const totalHeight = lines.length * lineHeightPx;
+            lines.forEach((line) => {
+                const idx = lines.indexOf(line);
+                const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
+                if (letterSpacingPx === 0) {
+                    ctx.fillText(line, 0, lineY);
+                } else {
+                    const chars: string[] = line.split('');
+                    const totalWidth = chars.reduce((width, char, i) => {
+                        const charWidth = ctx.measureText(char).width;
+                        return width + charWidth + (i < chars.length - 1 ? letterSpacingPx : 0);
+                    }, 0);
+                    let currentX = -totalWidth / 2;
+                    chars.forEach((char: string) => {
+                        const charWidth = ctx.measureText(char).width;
+                        ctx.fillText(char, currentX + charWidth / 2, lineY);
+                        currentX += charWidth + letterSpacingPx;
+                    });
+                }
+            });
+            ctx.restore();
+        });
+    };
+
+    const drawToCanvas = (canvas: HTMLCanvasElement, targetWidth: number, targetHeight: number) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        canvas.width = Math.max(1, Math.floor(targetWidth));
+        canvas.height = Math.max(1, Math.floor(targetHeight));
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Background
+        if (bgImageRef.current) {
+            ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
+        }
+        // Text
+        const scaleForFont = imageNaturalSize.width > 0 ? (canvas.width / imageNaturalSize.width) : 1;
+        drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
+        // Foreground (subject)
+        if (removedBgImageRef.current) {
+            ctx.drawImage(removedBgImageRef.current, 0, 0, canvas.width, canvas.height);
+        }
+    };
+
+    const drawPreview = () => {
+        if (!previewCanvasRef.current) return;
+        if (!displayedSize.width || !displayedSize.height) return;
+        drawToCanvas(previewCanvasRef.current, displayedSize.width, displayedSize.height);
+    };
+
+    useEffect(() => {
+        if (!isImageSetupDone) return;
+        drawPreview();
+    }, [isImageSetupDone, displayedSize.width, displayedSize.height, JSON.stringify(textSets)]);
 
     const addNewTextSet = () => {
         const newId = Math.max(...textSets.map(set => set.id), 0) + 1;
@@ -163,144 +339,19 @@ const Page = () => {
 
     const saveCompositeImage = () => {
         if (!canvasRef.current || !isImageSetupDone) return;
-    
+
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-    
-        const bgImg = new (window as any).Image();
-        bgImg.crossOrigin = "anonymous";
-        bgImg.onload = () => {
-            canvas.width = bgImg.width;
-            canvas.height = bgImg.height;
-    
-            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-    
-            textSets.forEach(textSet => {
-                ctx.save();
-                
-                // Set up text properties
-                const fontSizePx = textSet.fontSize;
-                ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
-                ctx.fillStyle = textSet.color;
-                ctx.globalAlpha = textSet.opacity;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                // letterSpacing handled manually below
-    
-                const x = canvas.width * (textSet.left + 50) / 100;
-                const y = canvas.height * (50 - textSet.top) / 100;
-    
-                // Move to position first
-                ctx.translate(x, y);
-                
-                // Apply 3D transforms
-                const tiltXRad = (-textSet.tiltX * Math.PI) / 180;
-                const tiltYRad = (-textSet.tiltY * Math.PI) / 180;
-    
-                // Use a simpler transform that maintains the visual tilt
-                ctx.transform(
-                    Math.cos(tiltYRad),          // Horizontal scaling
-                    Math.sin(0),          // Vertical skewing
-                    -Math.sin(0),         // Horizontal skewing
-                    Math.cos(tiltXRad),          // Vertical scaling
-                    0,                           // Horizontal translation
-                    0                            // Vertical translation
-                );
-    
-                // Apply rotation last
-                ctx.rotate((textSet.rotation * Math.PI) / 180);
+        const width = imageNaturalSize.width || 0;
+        const height = imageNaturalSize.height || 0;
+        if (width === 0 || height === 0) return;
 
-                const letterSpacingPx = textSet.letterSpacing || 0;
-                const maxLineWidthPx = canvas.width * ((textSet.boxWidth ?? 80) / 100);
-                const lineHeightPx = fontSizePx * (textSet.lineHeight ?? 1.2);
+        drawToCanvas(canvas, width, height);
 
-                const computeLineWidth = (lineText: string) => {
-                    const metricsWidth = ctx.measureText(lineText).width;
-                    const extra = Math.max(0, (lineText.length - 1)) * letterSpacingPx;
-                    return metricsWidth + extra;
-                };
-
-                const wrapText = (fullText: string) => {
-                    const paragraphs: string[] = fullText.split('\n');
-                    const lines: string[] = [];
-                    paragraphs.forEach((para) => {
-                        const words: string[] = para.split(' ');
-                        let current = '';
-                        for (let i = 0; i < words.length; i++) {
-                            const test = current ? current + ' ' + words[i] : words[i];
-                            if (computeLineWidth(test) <= maxLineWidthPx) {
-                                current = test;
-                            } else {
-                                if (current) lines.push(current);
-                                // hard-break long words by characters
-                                if (computeLineWidth(words[i]) > maxLineWidthPx) {
-                                    let chunk = '';
-                                    for (const ch of words[i]) {
-                                        const testChunk = chunk + ch;
-                                        if (computeLineWidth(testChunk) <= maxLineWidthPx) {
-                                            chunk = testChunk;
-                                        } else {
-                                            if (chunk) lines.push(chunk);
-                                            chunk = ch as string;
-                                        }
-                                    }
-                                    current = chunk;
-                                } else {
-                                    current = words[i];
-                                }
-                            }
-                        }
-                        if (current) lines.push(current);
-                    });
-                    return lines;
-                };
-
-                const lines = wrapText(textSet.text);
-                const totalHeight = lines.length * lineHeightPx;
-
-                lines.forEach((line, idx) => {
-                    const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
-                    if (letterSpacingPx === 0) {
-                        ctx.fillText(line, 0, lineY);
-                    } else {
-                        const chars: string[] = line.split('');
-                        const totalWidth = chars.reduce((width, char, i) => {
-                            const charWidth = ctx.measureText(char).width;
-                            return width + charWidth + (i < chars.length - 1 ? letterSpacingPx : 0);
-                        }, 0);
-                        let currentX = -totalWidth / 2;
-                        chars.forEach((char: string) => {
-                            const charWidth = ctx.measureText(char).width;
-                            ctx.fillText(char, currentX + charWidth / 2, lineY);
-                            currentX += charWidth + letterSpacingPx;
-                        });
-                    }
-                });
-                ctx.restore();
-            });
-    
-            if (removedBgImageUrl) {
-                const removedBgImg = new (window as any).Image();
-                removedBgImg.crossOrigin = "anonymous";
-                removedBgImg.onload = () => {
-                    ctx.drawImage(removedBgImg, 0, 0, canvas.width, canvas.height);
-                    triggerDownload();
-                };
-                removedBgImg.src = removedBgImageUrl;
-            } else {
-                triggerDownload();
-            }
-        };
-        bgImg.src = selectedImage || '';
-    
-        function triggerDownload() {
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = 'text-behind-image.png';
-            link.href = dataUrl;
-            link.click();
-        }
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'text-behind-image.png';
+        link.href = dataUrl;
+        link.click();
     };
 
     useEffect(() => {
@@ -393,7 +444,7 @@ const Page = () => {
                         <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-screen px-10 mt-2'>
                             <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
                                 <canvas ref={canvasRef} style={{ display: 'none' }} />
-                                <div className='flex items-center gap-2'>
+                                <div ref={outerRef} className='flex items-center gap-2 w-full'>
                                     <Button 
                                         onClick={saveCompositeImage} 
                                         className='md:hidden'
@@ -420,61 +471,16 @@ const Page = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div ref={containerRef} className="min-h-[400px] w-[80%] p-4 border border-border rounded-lg relative overflow-hidden">
-                                    {isImageSetupDone ? (
-                                        <Image
-                                            src={selectedImage} 
-                                            alt="Uploaded"
-                                            layout="fill"
-                                            objectFit="contain" 
-                                            objectPosition="center" 
-                                        />
-                                    ) : (
+                                <div ref={containerRef} className="min-h:[400px] w-[80%] border border-border rounded-lg relative overflow-hidden">
+                                    {!isImageSetupDone ? (
                                         <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
-                                    )}
-                                    <div ref={stageRef} className="absolute inset-4">
-                                        {isImageSetupDone && textSets.map(textSet => (
-                                            <div
-                                                key={textSet.id}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: `${50 - textSet.top}%`,
-                                                    left: `${textSet.left + 50}%`,
-                                                    transform: `
-                                                        translate(-50%, -50%) 
-                                                        rotate(${textSet.rotation}deg)
-                                                        perspective(1000px)
-                                                        rotateX(${textSet.tiltX}deg)
-                                                        rotateY(${textSet.tiltY}deg)
-                                                    `,
-                                                    color: textSet.color,
-                                                    textAlign: 'center',
-                                                    fontSize: `${textSet.fontSize * previewScale}px`,
-                                                    fontWeight: textSet.fontWeight,
-                                                    fontFamily: textSet.fontFamily,
-                                                    opacity: textSet.opacity,
-                                                    letterSpacing: `${(textSet.letterSpacing || 0) * previewScale}px`,
-                                                    transformStyle: 'preserve-3d',
-                                                    width: `${textSet.boxWidth ?? 80}%`,
-                                                    maxWidth: '100%',
-                                                    whiteSpace: 'pre-wrap',
-                                                    overflowWrap: 'anywhere',
-                                                    lineHeight: textSet.lineHeight ?? 1.2
-                                                }}
-                                            >
-                                                {textSet.text}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {removedBgImageUrl && (
-                                        <Image
-                                            src={removedBgImageUrl}
-                                            alt="Removed bg"
-                                            layout="fill"
-                                            objectFit="contain" 
-                                            objectPosition="center" 
-                                            className="absolute top-0 left-0 w-full h-full"
-                                        /> 
+                                    ) : (
+                                        <canvas
+                                            ref={previewCanvasRef}
+                                            width={displayedSize.width}
+                                            height={displayedSize.height}
+                                            style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}
+                                        />
                                     )}
                                 </div>
                                 {!currentUser.paid && (
