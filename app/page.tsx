@@ -8,13 +8,13 @@ import { HoverBorderGradient } from '@/components/ui/hover-border-gradient';
 import { HeroParallaxImages } from '@/components/hero-parallax-images';
 import { AdditionalInfo } from '@/components/additional-info';
 import Link from 'next/link';
-import FirecrawlAd from '@/ads/firecrawl';
+import AdsPlaceholder from '@/components/ads-placeholder';
 
 const page = () => {
     return ( 
         <div className='flex flex-col min-h-screen items-center w-full'>
             <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1609710199882100" crossOrigin="anonymous"></script>
-            <FirecrawlAd />
+            <AdsPlaceholder position="top" />
             <HeroHighlight>
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }} 

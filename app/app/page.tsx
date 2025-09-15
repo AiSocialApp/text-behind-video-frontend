@@ -4,8 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 
-import { useUser } from '@/hooks/useUser';
-import { useSessionContext, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useAuth } from '@/hooks/useAuth';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
@@ -24,14 +23,12 @@ import { removeBackground } from "@imgly/background-removal";
 
 import '@/app/fonts.css';
 import PayDialog from '@/components/pay-dialog';
-import AppAds from '@/components/editor/app-ads';
-import FirecrawlAd from '@/ads/firecrawl';
+import AdsPlaceholder from '@/components/ads-placeholder';
 
 const Page = () => {
-    const { user } = useUser();
-    const { session } = useSessionContext();
-    const supabaseClient = useSupabaseClient();
+    const { isAuthenticated, tokens, profile, logout, isLoading } = useAuth();
     const [currentUser, setCurrentUser] = useState<Profile>()
+    const [remainingImages, setRemainingImages] = useState<number | null>(null)
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isImageSetupDone, setIsImageSetupDone] = useState<boolean>(false);
@@ -41,32 +38,30 @@ const Page = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const getCurrentUser = async (userId: string) => {
-        try {
-            const { data: profile, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-
-            if (error) {
-                throw error;
-            }
-
-            if (profile) {
-                setCurrentUser(profile[0]);
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-        }
+    const getCurrentUser = async () => {
+        if (!profile) return;
+        // Map MeResponse to local Profile shape; minimal fields used here
+        setCurrentUser({
+            id: profile.username,
+            username: profile.username,
+            full_name: `${profile.given_name} ${profile.family_name}`.trim(),
+            avatar_url: '',
+            images_generated: 0,
+            paid: profile.entitlement !== 'starter',
+            subscription_id: '',
+        });
+        setRemainingImages(profile.remaining?.image ?? null)
     };
 
     const handleUploadImage = () => {
-        if (currentUser && (currentUser.images_generated < 2 || currentUser.paid)) {
+        const hasUnlimited = remainingImages === null;
+        const hasRemaining = (remainingImages ?? 0) > 0;
+        if (currentUser && (hasUnlimited || hasRemaining)) {
             if (fileInputRef.current) {
                 fileInputRef.current.click();
             }
         } else {
-            alert("You have reached the limit of free generations.");
+            alert("You have reached your image generation limit.");
             setIsPayDialogOpen(true);
         }
     };
@@ -87,13 +82,8 @@ const Page = () => {
             setRemovedBgImageUrl(url);
             setIsImageSetupDone(true);
 
-            if (currentUser) {
-                await supabaseClient
-                    .from('profiles')
-                    .update({ images_generated: currentUser.images_generated + 1 })
-                    .eq('id', currentUser.id) 
-                    .select();
-            }
+            // Decrement remaining locally if finite
+            setRemainingImages(prev => (prev === null ? null : Math.max(0, (prev || 0) - 1)))
             
         } catch (error) {
             console.error(error);
@@ -237,19 +227,17 @@ const Page = () => {
     };
 
     useEffect(() => {
-      if (user?.id) {
-        getCurrentUser(user.id)
+      if (isAuthenticated) {
+        getCurrentUser();
       }
-    }, [user])
+    }, [isAuthenticated, profile])
     
     return (
         <>
-            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1609710199882100" crossOrigin="anonymous"></script>
-            {user && session && session.user && currentUser ? (
+            {/* Ads script removed */}
+            {!isLoading && isAuthenticated && currentUser ? (
                 <div className='flex flex-col h-screen'>
-                    {!currentUser.paid && (
-                        <FirecrawlAd />
-                    )}
+                    {!currentUser.paid && null}
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
                         <h2 className="text-4xl md:text-2xl font-semibold tracking-tight">
                             <span className="block md:hidden">TBI</span>
@@ -265,14 +253,12 @@ const Page = () => {
                             />
                             <div className='flex items-center gap-5'>
                                 <div className='hidden md:block font-semibold'>
-                                    {currentUser.paid ? (
-                                        <p className='text-sm'>
-                                            Unlimited generations
-                                        </p>
+                                    {(remainingImages === null) ? (
+                                        <p className='text-sm'>Unlimited generations</p>
                                     ) : (
                                         <div className='flex items-center gap-2'>
                                             <p className='text-sm'>
-                                                {2 - (currentUser.images_generated)} generations left
+                                                {remainingImages} generations left
                                             </p>
                                             <Button 
                                                 variant="link" 
@@ -289,7 +275,11 @@ const Page = () => {
                                         Upload image
                                     </Button>
                                     {selectedImage && (
-                                        <Button onClick={saveCompositeImage} className='hidden md:flex'>
+                                        <Button 
+                                            onClick={saveCompositeImage} 
+                                            className='hidden md:flex'
+                                            disabled={!(remainingImages === null || (remainingImages ?? 0) > 0)}
+                                        >
                                             Save image
                                         </Button>
                                     )}
@@ -307,12 +297,15 @@ const Page = () => {
                                     <DropdownMenuLabel>
                                         <div className="flex flex-col space-y-1">
                                             <p className="text-sm font-medium leading-none">{currentUser?.full_name}</p>
-                                            <p className="text-xs leading-none text-muted-foreground">{user?.user_metadata.email}</p>
+                                            <p className="text-xs leading-none text-muted-foreground">{profile?.email}</p>
                                         </div>
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => setIsPayDialogOpen(true)}>
                                         <button>{currentUser?.paid ? 'View Plan' : 'Upgrade to Pro'}</button>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => logout()}>
+                                        <button>Log out</button>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -324,18 +317,20 @@ const Page = () => {
                             <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
                                 <canvas ref={canvasRef} style={{ display: 'none' }} />
                                 <div className='flex items-center gap-2'>
-                                    <Button onClick={saveCompositeImage} className='md:hidden'>
+                                    <Button 
+                                        onClick={saveCompositeImage} 
+                                        className='md:hidden'
+                                        disabled={!(remainingImages === null || (remainingImages ?? 0) > 0)}
+                                    >
                                         Save image
                                     </Button>
                                     <div className='block md:hidden'>
-                                        {currentUser.paid ? (
-                                            <p className='text-sm'>
-                                                Unlimited generations
-                                            </p>
+                                        {(remainingImages === null) ? (
+                                            <p className='text-sm'>Unlimited generations</p>
                                         ) : (
                                             <div className='flex items-center gap-5'>
                                                 <p className='text-sm'>
-                                                    {2 - (currentUser.images_generated)} generations left
+                                                    {remainingImages} generations left
                                                 </p>
                                                 <Button 
                                                     variant="link" 
@@ -399,7 +394,7 @@ const Page = () => {
                                     )}
                                 </div>
                                 {!currentUser.paid && (
-                                    <AppAds />
+                                    <AdsPlaceholder />
                                 )}
                             </div>
                             <div className='flex flex-col w-full md:w-1/2'>
@@ -414,6 +409,7 @@ const Page = () => {
                                                 removeTextSet={removeTextSet}
                                                 duplicateTextSet={duplicateTextSet}
                                                 userId={currentUser.id}
+                                                isPaid={currentUser.paid}
                                             />
                                         ))}
                                     </Accordion>
@@ -425,7 +421,7 @@ const Page = () => {
                             <h2 className="text-xl font-semibold">Welcome, get started by uploading an image!</h2>
                         </div>
                     )} 
-                    <PayDialog userDetails={currentUser as any} userEmail={user.user_metadata.email} isOpen={isPayDialogOpen} onClose={() => setIsPayDialogOpen(false)} /> 
+                    <PayDialog userDetails={currentUser as any} userEmail={profile?.email || ''} isOpen={isPayDialogOpen} onClose={() => setIsPayDialogOpen(false)} /> 
                 </div>
             ) : (
                 <Authenticate />

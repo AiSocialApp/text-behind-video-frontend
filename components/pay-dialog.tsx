@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import axios from 'axios'
+import { useAuth } from '@/hooks/useAuth'
+import { AppApi } from '@/lib/api'
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -40,6 +42,7 @@ interface PayDialogProps {
 const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, price, features }) => {
     const router = useRouter();
     const { toast } = useToast();
+    const { tokens } = useAuth();
     const [loading, setLoading] = React.useState(false);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isAnnual, setIsAnnual] = React.useState(false);
@@ -47,14 +50,9 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
     const handleDirectToPaymentLink = async () => {
         setLoading(true); 
         try {
-            const response = await axios.post('/api/create-checkout-session', {
-                user_id: userDetails.id,
-                email: userEmail,
-                plan_name: "Text Behind Image Pro Plan",
-                plan_type: isAnnual ? 'ANNUAL' : 'MONTHLY',
-            });
-
-            router.push(response.data.paymentLink);
+            const accessToken = tokens.accessToken || ''
+            const portal = await AppApi.portal(accessToken, undefined, window.location.href)
+            router.push(portal.billing_portal_url)
         } catch (error) {
             toast({
                 title: "Error",
@@ -69,27 +67,14 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
     const handleCancelSubscription = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/cancel-subscription', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ subscription_id: userDetails.subscription_id }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to cancel subscription');
-            }
-
-            toast({
-                title: "Your subscription has been cancelled",
-            })
-            window.location.reload()
+            const accessToken = tokens.accessToken || ''
+            const portal = await AppApi.portal(accessToken, undefined, window.location.href)
+            router.push(portal.billing_portal_url)
         } catch (error) {
-            console.error('Error cancelling subscription:', error);
+            console.error('Error opening billing portal:', error);
             toast({
                 title: "Error",
-                description: "Failed to cancel subscription",
+                description: "Failed to open billing portal",
                 variant: "destructive"
             });
         } finally {
@@ -166,6 +151,7 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
 const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, onClose }) => {
   const router = useRouter();
   const { toast } = useToast();
+  const { tokens } = useAuth();
   const [loading, setLoading] = React.useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
   const [isAnnual, setIsAnnual] = React.useState(true);
@@ -173,14 +159,9 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
   const handleDirectToPaymentLink = async () => {
     setLoading(true); 
     try {
-      const response = await axios.post('/api/create-checkout-session', {
-        user_id: userDetails.id,
-        email: userEmail,
-        plan_name: "Text Behind Image Pro Plan",
-        plan_type: isAnnual ? 'ANNUAL' : 'MONTHLY',
-      });
-
-      router.push(response.data.paymentLink);
+      const accessToken = tokens.accessToken || ''
+      const portal = await AppApi.portal(accessToken, undefined, window.location.href)
+      router.push(portal.billing_portal_url)
     } catch (error) {
       toast({
         title: "Error",
@@ -195,27 +176,14 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
   const handleCancelSubscription = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ subscription_id: userDetails.subscription_id }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to cancel subscription');
-      }
-
-      toast({
-        title: "Your subscription has been cancelled",
-      })
-      window.location.reload()
+      const accessToken = tokens.accessToken || ''
+      const portal = await AppApi.portal(accessToken, undefined, window.location.href)
+      router.push(portal.billing_portal_url)
     } catch (error) {
-      console.error('Error cancelling subscription:', error);
+      console.error('Error opening billing portal:', error);
       toast({
         title: "Error",
-        description: "Failed to cancel subscription",
+        description: "Failed to open billing portal",
         variant: "destructive"
       });
     } finally {

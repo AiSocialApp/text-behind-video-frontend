@@ -6,10 +6,7 @@ const nextConfig = {
               protocol: 'https',
               hostname: 'images.unsplash.com',
             },
-            {
-              protocol: 'https',
-              hostname: 'lxlfwrdbdhafahrrgtzk.supabase.co',
-            },
+            // Removed supabase host; add any image hosts you need here
           ],
     },
 
