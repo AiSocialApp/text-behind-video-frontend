@@ -16,6 +16,10 @@ import { ModeToggle } from '@/components/mode-toggle';
 import { Profile } from '@/types';
 import Authenticate from '@/components/authenticate';
 import TextCustomizer from '@/components/editor/text-customizer';
+import Sidebar from '@/components/layout/Sidebar';
+import ImageEditorView from '@/components/views/ImageEditorView';
+import VideoEditorView from '@/components/views/VideoEditorView';
+import AssetsView from '@/components/views/AssetsView';
 
 import { PlusIcon, ReloadIcon } from '@radix-ui/react-icons';
 
@@ -45,6 +49,8 @@ const Page = () => {
 
     const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
     const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('image');
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const getCurrentUser = async () => {
         if (!profile) return;
@@ -372,6 +378,7 @@ const Page = () => {
                             <span className="hidden md:block">Text behind image editor</span>
                         </h2>
                         <div className='flex gap-4 items-center'>
+                            <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>Menu</Button>
                             <input
                                 type="file"
                                 ref={fileInputRef}
@@ -439,79 +446,46 @@ const Page = () => {
                             </DropdownMenu>
                         </div>
                     </header>
-                    <Separator /> 
-                    {selectedImage ? (
-                        <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-screen px-10 mt-2'>
-                            <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
-                                <canvas ref={canvasRef} style={{ display: 'none' }} />
-                                <div ref={outerRef} className='flex items-center gap-2 w-full'>
-                                    <Button 
-                                        onClick={saveCompositeImage} 
-                                        className='md:hidden'
-                                        disabled={!(remainingImages === null || (remainingImages ?? 0) > 0)}
-                                    >
-                                        Save image
-                                    </Button>
-                                    <div className='block md:hidden'>
-                                        {(remainingImages === null) ? (
-                                            <p className='text-sm'>Unlimited generations</p>
-                                        ) : (
-                                            <div className='flex items-center gap-5'>
-                                                <p className='text-sm'>
-                                                    {remainingImages} generations left
-                                                </p>
-                                                <Button 
-                                                    variant="link" 
-                                                    className="p-0 h-auto text-sm text-primary hover:underline"
-                                                    onClick={() => setIsPayDialogOpen(true)}
-                                                >
-                                                    Upgrade
-                                                </Button>
-                                            </div>
-                                        )}
+                    <Separator />
+                    <div className='flex w-full h-full'>
+                        <Sidebar
+                            activeView={activeView}
+                            onSelect={(v) => setActiveView(v)}
+                            isMobileOpen={isMobileSidebarOpen}
+                            onCloseMobile={() => setIsMobileSidebarOpen(false)}
+                        />
+                        <div className='flex-1'>
+                            {activeView === 'image' && (
+                                <ImageEditorView
+                                    selectedImage={selectedImage}
+                                    isImageSetupDone={isImageSetupDone}
+                                    canvasRef={canvasRef}
+                                    outerRef={outerRef}
+                                    previewCanvasRef={previewCanvasRef}
+                                    displayedSize={displayedSize}
+                                    remainingImages={remainingImages}
+                                    saveCompositeImage={saveCompositeImage}
+                                    addNewTextSet={addNewTextSet}
+                                    textSets={textSets}
+                                    handleAttributeChange={handleAttributeChange}
+                                    removeTextSet={removeTextSet}
+                                    duplicateTextSet={duplicateTextSet}
+                                    currentUser={currentUser}
+                                />
+                            )}
+                            {activeView === 'video' && (
+                                <VideoEditorView>
+                                    <div className='flex items-center justify-center min-h-screen w-full'>
+                                        <h2 className="text-xl font-semibold">Video view (coming soon)</h2>
                                     </div>
-                                </div>
-                                <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
-                                    {!isImageSetupDone ? (
-                                        <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
-                                    ) : (
-                                        <canvas
-                                            ref={previewCanvasRef}
-                                            width={displayedSize.width}
-                                            height={displayedSize.height}
-                                            style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}
-                                        />
-                                    )}
-                                </div>
-                                {!currentUser.paid && (
-                                    <AdsPlaceholder />
-                                )}
-                            </div>
-                            <div className='flex flex-col w-full md:w-1/2'>
-                                <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
-                                <ScrollArea className="h-[calc(100vh-10rem)] p-2">
-                                    <Accordion type="single" collapsible className="w-full mt-2">
-                                        {textSets.map(textSet => (
-                                            <TextCustomizer 
-                                                key={textSet.id}
-                                                textSet={textSet}
-                                                handleAttributeChange={handleAttributeChange}
-                                                removeTextSet={removeTextSet}
-                                                duplicateTextSet={duplicateTextSet}
-                                                userId={currentUser.id}
-                                                isPaid={currentUser.paid}
-                                            />
-                                        ))}
-                                    </Accordion>
-                                </ScrollArea>
-                            </div>
+                                </VideoEditorView>
+                            )}
+                            {activeView === 'assets' && (
+                                <AssetsView />
+                            )}
                         </div>
-                    ) : (
-                        <div className='flex items-center justify-center min-h-screen w-full'>
-                            <h2 className="text-xl font-semibold">Welcome, get started by uploading an image!</h2>
-                        </div>
-                    )} 
-                    <PayDialog userDetails={currentUser as any} userEmail={profile?.email || ''} isOpen={isPayDialogOpen} onClose={() => setIsPayDialogOpen(false)} /> 
+                    </div>
+                    <PayDialog userDetails={currentUser as any} userEmail={profile?.email || ''} isOpen={isPayDialogOpen} onClose={() => setIsPayDialogOpen(false)} />
                 </div>
             ) : (
                 <Authenticate />
