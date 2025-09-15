@@ -29,6 +29,8 @@ interface TextCustomizerProps {
         tiltX: number;
         tiltY: number;
         letterSpacing: number;
+        boxWidth?: number;
+        lineHeight?: number;
     };
     handleAttributeChange: (id: number, attribute: string, value: any) => void;
     removeTextSet: (id: number) => void;
@@ -54,6 +56,7 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
         { id: 'rotation', icon: <RotateCw size={20} />, label: 'Rotate' },
         { id: 'tiltX', icon: <ArrowLeftRight size={20} />, label: 'Tilt X (3D effect)', premium: true },
         { id: 'tiltY', icon: <ArrowUpDown size={20} />, label: 'Tilt Y (3D effect)', premium: true },
+        { id: 'boxWidth', icon: <AlignHorizontalSpaceAround size={20} />, label: 'Text box width' },
     ];  
 
     const handlePremiumAttributeChange = (attribute: string, value: any) => {
@@ -136,6 +139,15 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                                     currentValue={textSet.top}
                                     handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
                                 />
+                                <SliderField
+                                    attribute="boxWidth"
+                                    label="Text Box Width (%)"
+                                    min={10}
+                                    max={100}
+                                    step={1}
+                                    currentValue={textSet.boxWidth ?? 80}
+                                    handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
+                                />
                             </div>
                         )}
 
@@ -164,17 +176,28 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                         )}
                         
                         {activeControl === 'letterSpacing' && (
-                            <SliderField
-                                attribute="letterSpacing"
-                                label="Letter Spacing"
-                                min={-20}
-                                max={100}
-                                step={1}
-                                currentValue={textSet.letterSpacing}
-                                handleAttributeChange={(attribute, value) => handlePremiumAttributeChange(attribute, value)}
-                                disabled={!isPaidUser}
-                                premiumFeature={!isPaidUser}
-                            />
+                            <div className="space-y-4">
+                                <SliderField
+                                    attribute="letterSpacing"
+                                    label="Letter Spacing"
+                                    min={-20}
+                                    max={100}
+                                    step={1}
+                                    currentValue={textSet.letterSpacing}
+                                    handleAttributeChange={(attribute, value) => handlePremiumAttributeChange(attribute, value)}
+                                    disabled={!isPaidUser}
+                                    premiumFeature={!isPaidUser}
+                                />
+                                <SliderField
+                                    attribute="lineHeight"
+                                    label="Line Spacing"
+                                    min={0.5}
+                                    max={3}
+                                    step={0.05}
+                                    currentValue={textSet.lineHeight ?? 1.2}
+                                    handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
+                                />
+                            </div>
                         )}
 
                         {activeControl === 'opacity' && (
@@ -274,6 +297,15 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                         handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
                     />
                     <SliderField
+                        attribute="boxWidth"
+                        label="Text Box Width (%)"
+                        min={10}
+                        max={100}
+                        step={1}
+                        currentValue={textSet.boxWidth ?? 80}
+                        handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
+                    />
+                    <SliderField
                         attribute="fontSize"
                         label="Text Size"
                         min={10}
@@ -301,6 +333,15 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                         handleAttributeChange={(attribute, value) => handlePremiumAttributeChange(attribute, value)}
                         disabled={!isPaidUser}
                         premiumFeature={!isPaidUser}
+                    />
+                    <SliderField
+                        attribute="lineHeight"
+                        label="Line Spacing"
+                        min={0.5}
+                        max={3}
+                        step={0.05}
+                        currentValue={textSet.lineHeight ?? 1.2}
+                        handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
                     />
                     <SliderField
                         attribute="opacity"

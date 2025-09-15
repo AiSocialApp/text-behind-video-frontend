@@ -107,7 +107,8 @@ const Page = () => {
             rotation: 0,
             tiltX: 0,
             tiltY: 0,
-            letterSpacing: 0
+            letterSpacing: 0,
+            boxWidth: 80
         }]);
     };
 
@@ -376,7 +377,12 @@ const Page = () => {
                                                 fontFamily: textSet.fontFamily,
                                                 opacity: textSet.opacity,
                                                 letterSpacing: `${textSet.letterSpacing}px`,
-                                                transformStyle: 'preserve-3d'
+                                                transformStyle: 'preserve-3d',
+                                                width: `${textSet.boxWidth ?? 80}%`,
+                                                maxWidth: '100%',
+                                                whiteSpace: 'pre-wrap',
+                                                overflowWrap: 'anywhere',
+                                                lineHeight: textSet.lineHeight ?? 1.2
                                             }}
                                         >
                                             {textSet.text}
