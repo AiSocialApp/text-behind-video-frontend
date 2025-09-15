@@ -37,15 +37,13 @@ const Page = () => {
     const [isPayDialogOpen, setIsPayDialogOpen] = useState<boolean>(false); 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const stageRef = useRef<HTMLDivElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+    
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const bgImageRef = useRef<HTMLImageElement | null>(null);
     const removedBgImageRef = useRef<HTMLImageElement | null>(null);
     const outerRef = useRef<HTMLDivElement>(null);
 
     const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-    const [previewScale, setPreviewScale] = useState<number>(1);
     const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
     const getCurrentUser = async () => {
@@ -116,11 +114,13 @@ const Page = () => {
     const updatePreviewScale = () => {
         if (!outerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
         const rect = outerRef.current.getBoundingClientRect();
-        const availableWidth = rect.width * 0.8; // container is w-[80%]
-        const scale = availableWidth / imageNaturalSize.width;
+        const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 200));
+        const scale = Math.min(
+            rect.width / imageNaturalSize.width,
+            maxPreviewHeight / imageNaturalSize.height
+        );
         const targetWidth = Math.max(1, Math.floor(imageNaturalSize.width * scale));
         const targetHeight = Math.max(1, Math.floor(imageNaturalSize.height * scale));
-        setPreviewScale(scale || 1);
         setDisplayedSize({ width: targetWidth, height: targetHeight });
     };
 
@@ -471,7 +471,7 @@ const Page = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div ref={containerRef} className="min-h:[400px] w-[80%] border border-border rounded-lg relative overflow-hidden">
+                                <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
                                     {!isImageSetupDone ? (
                                         <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
                                     ) : (
