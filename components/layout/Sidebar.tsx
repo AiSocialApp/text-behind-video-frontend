@@ -29,8 +29,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelect, isMobileOpen = 
 
     const content = (
         <div className="flex flex-col items-center py-2">
-            <Item id="image" icon={<ImageIcon size={18} />} label="Image" />
             <Item id="video" icon={<Video size={18} />} label="Video" />
+            <Item id="image" icon={<ImageIcon size={18} />} label="Image" />
             <Item id="assets" icon={<Library size={18} />} label="Assets" />
         </div>
     );

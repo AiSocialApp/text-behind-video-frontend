@@ -12,6 +12,7 @@ import nature from '@/public/nature.png'
 import vie from '@/public/vie.png'
 import snap from '@/public/snap.png'
 
+// DEPRECATED: This component is no longer used. See HeroVideoGallery.tsx for the new implementation.
 export function HeroParallaxImages() {
   return <ParallaxScroll images={images} className="w-full"/>;
 }

@@ -49,7 +49,7 @@ const Page = () => {
 
     const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
     const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-    const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('image');
+    const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('video');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const getCurrentUser = async () => {
@@ -343,7 +343,7 @@ const Page = () => {
         setTextSets(prev => prev.filter(set => set.id !== id));
     };
 
-    const saveCompositeImage = () => {
+    const saveCompositeImage = async () => {
         if (!canvasRef.current || !isImageSetupDone) return;
 
         const canvas = canvasRef.current;
@@ -352,12 +352,26 @@ const Page = () => {
         if (width === 0 || height === 0) return;
 
         drawToCanvas(canvas, width, height);
-
-        const dataUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.download = 'text-behind-image.png';
-        link.href = dataUrl;
-        link.click();
+        // Save locally
+        try {
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'text-behind-image.png';
+            link.href = dataUrl;
+            link.click();
+        } catch (e) {
+            console.error('Local save failed', e);
+        }
+        // Upload to backend
+        try {
+            const blob: Blob = await new Promise((resolve) => canvas.toBlob(b => resolve(b as Blob), 'image/png'));
+            const ext = 'png';
+            const start = await import('@/lib/api').then(m => m.AppApi.startImageAsset(tokens.accessToken as string, { extension: ext }));
+            const putUrl = (start as any).image.put_url as string;
+            await fetch(putUrl, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: blob });
+        } catch (e) {
+            console.error('Image upload failed', e);
+        }
     };
 
     useEffect(() => {
@@ -374,10 +388,10 @@ const Page = () => {
                     {!currentUser.paid && null}
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
                         <h2 className="text-4xl md:text-2xl font-semibold tracking-tight">
-                            <span className="block md:hidden">TBI</span>
-                            <span className="hidden md:block">Text behind image editor</span>
+                            <span className="block md:hidden">TBV</span>
+                            <span className="hidden md:block">Text behind video</span>
                         </h2>
-                        <div className='flex gap-4 items-center'>
+                        <div className='flex gap-2 items-center'>
                             <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>Menu</Button>
                             <input
                                 type="file"
@@ -403,20 +417,6 @@ const Page = () => {
                                                 Upgrade
                                             </Button>
                                         </div>
-                                    )}
-                                </div>
-                                <div className='flex gap-2'>
-                                    <Button onClick={handleUploadImage}>
-                                        Upload image
-                                    </Button>
-                                    {selectedImage && (
-                                        <Button 
-                                            onClick={saveCompositeImage} 
-                                            className='hidden md:flex'
-                                            disabled={!(remainingImages === null || (remainingImages ?? 0) > 0)}
-                                        >
-                                            Save image
-                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -465,6 +465,7 @@ const Page = () => {
                                     displayedSize={displayedSize}
                                     remainingImages={remainingImages}
                                     saveCompositeImage={saveCompositeImage}
+                                    onUploadImage={handleUploadImage}
                                     addNewTextSet={addNewTextSet}
                                     textSets={textSets}
                                     handleAttributeChange={handleAttributeChange}
@@ -474,11 +475,7 @@ const Page = () => {
                                 />
                             )}
                             {activeView === 'video' && (
-                                <VideoEditorView>
-                                    <div className='flex items-center justify-center min-h-screen w-full'>
-                                        <h2 className="text-xl font-semibold">Video view (coming soon)</h2>
-                                    </div>
-                                </VideoEditorView>
+                                <VideoEditorView />
                             )}
                             {activeView === 'assets' && (
                                 <AssetsView />

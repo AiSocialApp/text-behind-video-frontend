@@ -143,6 +143,58 @@ export const AppApi = {
     url.searchParams.set("return_url", return_url);
     return authFetch(url.toString(), accessToken);
   },
+  async startImageAsset(accessToken: string, payload: { extension: string }): Promise<{
+    asset_id: string;
+    image: { bucket: string; key: string; put_url: string };
+  }> {
+    return authFetch(endpoints.app.assetsImageStart, accessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extension: payload.extension.replace(/^\./, '') }),
+    });
+  },
+  async listAssets(accessToken: string, params?: { page?: number; limit?: number }): Promise<{ assets: Record<string, any> }> {
+    const url = new URL(endpoints.app.assets);
+    if (params?.page) url.searchParams.set("page", String(params.page));
+    if (params?.limit) url.searchParams.set("limit", String(params.limit));
+    return authFetch(url.toString(), accessToken);
+  },
+  async startAsset(accessToken: string, payload: { extension: string; length: number }): Promise<{
+    asset_id: string;
+    overlay: { bucket: string; key: string; put_url: string };
+    video: { bucket: string; key: string; s3_upload_id: string };
+  }> {
+    return authFetch(endpoints.app.assetsStart, accessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extension: payload.extension.replace(/^\./, ''), length: Math.max(0, Math.floor(payload.length)) }),
+    });
+  },
+  async signMultipartPart(
+    accessToken: string,
+    params: { asset_id: string; s3_upload_id: string; part_number: number; key: string }
+  ): Promise<{ url: string }> {
+    const url = new URL(endpoints.app.uploadSign);
+    url.searchParams.set("asset_id", params.asset_id);
+    url.searchParams.set("s3_upload_id", params.s3_upload_id);
+    url.searchParams.set("part_number", String(params.part_number));
+    url.searchParams.set("key", params.key);
+    return authFetch(url.toString(), accessToken);
+  },
+  async completeMultipart(
+    accessToken: string,
+    payload: { asset_id: string; s3_upload_id: string; key: string; parts: Array<{ ETag: string; PartNumber: number }> }
+  ): Promise<{ status: string }> {
+    return authFetch(endpoints.app.uploadComplete, accessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  },
+  async getAsset(accessToken: string, asset_id: string): Promise<{ asset: Record<string, unknown> }> {
+    const url = `${endpoints.app.assets}${encodeURIComponent(asset_id)}/`;
+    return authFetch(url, accessToken);
+  },
 };
 
 
