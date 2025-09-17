@@ -17,8 +17,16 @@ const page = () => {
                     initial={{ opacity: 0, y: 20 }} 
                     animate={{ opacity: 1, y: [20, -5, 0] }} 
                     transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
-                    className="text-3xl lg:text-5xl lg:leading-tight max-w-5xl mx-auto text-center tracking-tight font-bold text-black dark:text-white"
+                    className="flex flex-row items-center text-3xl lg:text-5xl lg:leading-tight max-w-5xl mx-auto text-center tracking-tight font-bold text-black dark:text-white"
                 >
+                    <img
+                        src={`logo.svg`}
+                        alt={'texe-behind-video Logo'}
+                        className="object-cover w-20 h-20 mr-5"
+                        loading="lazy"
+                        draggable={false}
+                        onContextMenu={e => e.preventDefault()}
+                    />
                     Create {" "}
                     <Highlight className='text-white'>
                         text-behind-video
