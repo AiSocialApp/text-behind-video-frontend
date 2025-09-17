@@ -64,7 +64,7 @@ const AssetsView: React.FC = () => {
               </div>
               <div className="text-xs text-muted-foreground">Status: {a.status}</div>
               {a.media_type === 'IMAGE' && a.url && (
-                <img crossOrigin="anonymous" src={a.url} alt="Image asset" className="w-full rounded border max-h-300" />
+                <img crossOrigin="anonymous" src={a.url} alt="Image asset" className="w-full rounded border max-h-[300px] object-contain" />
               )}
               {a.media_type === 'VIDEO' && a.thumb_url && (
                 <img crossOrigin="anonymous" src={a.thumb_url} alt="Video thumbnail" className="rounded border max-h-[300px] object-contain" />

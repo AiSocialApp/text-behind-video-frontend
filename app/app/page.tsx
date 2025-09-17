@@ -5,35 +5,29 @@ import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 
 import { useAuth } from '@/hooks/useAuth';
-
+import { Highlight } from '@/components/ui/hero-highlight';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from '@/components/ui/separator';
-import { Accordion } from '@/components/ui/accordion';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Profile } from '@/types';
 import Authenticate from '@/components/authenticate';
-import TextCustomizer from '@/components/editor/text-customizer';
 import Sidebar from '@/components/layout/Sidebar';
 import ImageEditorView from '@/components/views/ImageEditorView';
 import VideoEditorView from '@/components/views/VideoEditorView';
 import AssetsView from '@/components/views/AssetsView';
-
-import { PlusIcon, ReloadIcon } from '@radix-ui/react-icons';
-
-import { removeBackground } from "@imgly/background-removal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Menu } from 'lucide-react'
 
 import '@/app/fonts.css';
 import PayDialog from '@/components/pay-dialog';
-import AdsPlaceholder from '@/components/ads-placeholder';
 
 const Page = () => {
     const { isAuthenticated, tokens, profile, logout, isLoading } = useAuth();
     const [currentUser, setCurrentUser] = useState<Profile>()
-    const [remainingImages, setRemainingImages] = useState<number | null>(null)
     const [isPayDialogOpen, setIsPayDialogOpen] = useState<boolean>(false); 
+    const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
 
     const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('video');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -68,7 +62,6 @@ const Page = () => {
             paid: profile.entitlement !== 'starter',
             subscription_id: '',
         });
-        setRemainingImages(profile.remaining?.image ?? null)
     };
 
     useEffect(() => {
@@ -84,32 +77,71 @@ const Page = () => {
                 <div className='flex flex-col h-screen'>
                     {!currentUser.paid && null}
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
-                        <h2 className="text-4xl md:text-2xl font-semibold tracking-tight">
-                            <span className="block md:hidden">TBV</span>
-                            <span className="hidden md:block">Text behind video</span>
+                         <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>
+  <Menu className='h-5 w-5' />
+</Button>
+
+                        <h2 className="text-4xl md:text-2xl font-semibold tracking-tight flex flex-row items-center">
+                            
+
+                        <div className='hidden md:block'>
+                            <Highlight className='text-white block'>
+                                textbehindvideo.io
+                            </Highlight>
+                        </div>
                         </h2>
                         <div className='flex gap-2 items-center'>
-                            <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>Menu</Button>
                             <div className='flex items-center gap-5'>
-                                <div className='hidden md:block font-semibold'>
-                                    {(remainingImages === null) ? (
-                                        <p className='text-sm'>Unlimited generations</p>
-                                    ) : (
+                                <Button
+                                    variant="link"
+                                    className="block lg:hidden p-0 h-auto text-sm text-primary hover:underline"
+                                    onClick={() => setIsPlanDialogOpen(true)}
+                                >
+                                    My Plan
+                                </Button>
+                                <div className='hidden lg:block font-semibold'>
+                                    {(profile?.entitlement &&
                                         <div className='flex items-center gap-2'>
                                             <p className='text-sm'>
-                                                {remainingImages} generations left
+                                                Plan: {profile?.entitlement[0].toLocaleUpperCase()}{profile?.entitlement.slice(1)}
                                             </p>
-                                            <Button
-                                                variant="link"
-                                                className="p-0 h-auto text-sm text-primary hover:underline"
-                                                onClick={() => setIsPayDialogOpen(true)}
-                                            >
-                                                Upgrade
-                                            </Button>
                                         </div>
                                     )}
                                 </div>
+                                <div className='hidden lg:block font-semibold'>
+                                    {(profile?.remaining?.image === null) ? (
+                                        <p className='text-sm'>Unlimited images</p>
+                                    ) : (
+                                        <div className='flex items-center gap-2'>
+                                            <p className='text-sm'>
+                                                {profile?.remaining?.image} images left
+                                            </p>
+
+                                        </div>
+                                    )}
+                                </div>
+                                <div className='hidden lg:block font-semibold'>
+
+                                    {(profile?.remaining?.video === null) ? (
+                                        <p className='text-sm'>Unlimited video seconds</p>
+                                    ) : (
+                                        <div className='flex items-center gap-2'>
+                                            <p className='text-sm'>
+                                                {profile?.remaining?.video} video seconds left
+                                            </p>
+
+                                        </div>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-sm text-primary hover:underline hidden lg:block"
+                                    onClick={() => setIsPayDialogOpen(true)}
+                                >
+                                    Upgrade
+                                </Button>
                             </div>
+
                             <ModeToggle />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -191,6 +223,34 @@ const Page = () => {
                         </div>
                     </div>
                     <PayDialog userDetails={currentUser as any} userEmail={profile?.email || ''} isOpen={isPayDialogOpen} onClose={() => setIsPayDialogOpen(false)} />
+                    <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Your Plan</DialogTitle>
+                                <DialogDescription>
+                                    Quotas are calculated on a rolling 30-day basis.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className='space-y-2 text-sm'>
+                                <p>Plan: {profile?.entitlement ? profile.entitlement[0].toUpperCase() + profile.entitlement.slice(1) : 'N/A'}</p>
+                                {(profile?.remaining?.image === null) ? (
+                                    <p>Unlimited images</p>
+                                ) : (
+                                    <p>{profile?.remaining?.image} images left</p>
+                                )}
+                                {(profile?.remaining?.video === null) ? (
+                                    <p>Unlimited video seconds</p>
+                                ) : (
+                                    <p>{profile?.remaining?.video} video seconds left</p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button onClick={() => setIsPayDialogOpen(true)}>
+                                    Upgrade
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             ) : (
                 <Authenticate />

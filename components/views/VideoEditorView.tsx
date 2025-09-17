@@ -182,97 +182,105 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   }, [removedFgUrl, posterUrl, displayedSize.width, displayedSize.height, naturalSize.width]);
 
   const drawTextSets = (ctx: CanvasRenderingContext2D, targetWidth: number, targetHeight: number, scaleForFont: number) => {
-    textSets.forEach((textSet: any) => {
-      ctx.save();
-      const fontSizePx = textSet.fontSize * scaleForFont;
-      ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
-      ctx.fillStyle = textSet.color;
-      ctx.globalAlpha = textSet.opacity;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    Promise.all(
+      textSets.map((textSet) => {
+        const fontSizePx = textSet.fontSize * scaleForFont;
+        const fontStr = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
+        return document.fonts.load(fontStr);
+      })
+    ).then(() => {
+      textSets.forEach((textSet: any) => {
+        ctx.save();
+        const fontSizePx = textSet.fontSize * scaleForFont;
+        ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
+        ctx.fillStyle = textSet.color;
+        ctx.globalAlpha = textSet.opacity;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-      const x = targetWidth * (textSet.left + 50) / 100;
-      const y = targetHeight * (50 - textSet.top) / 100;
-      ctx.translate(x, y);
+        const x = targetWidth * (textSet.left + 50) / 100;
+        const y = targetHeight * (50 - textSet.top) / 100;
+        ctx.translate(x, y);
 
-      const tiltXRad = (-textSet.tiltX * Math.PI) / 180;
-      const tiltYRad = (-textSet.tiltY * Math.PI) / 180;
-      ctx.transform(
-        Math.cos(tiltYRad),
-        Math.sin(0),
-        -Math.sin(0),
-        Math.cos(tiltXRad),
-        0,
-        0
-      );
-      ctx.rotate((textSet.rotation * Math.PI) / 180);
+        const tiltXRad = (-textSet.tiltX * Math.PI) / 180;
+        const tiltYRad = (-textSet.tiltY * Math.PI) / 180;
+        ctx.transform(
+          Math.cos(tiltYRad),
+          Math.sin(0),
+          -Math.sin(0),
+          Math.cos(tiltXRad),
+          0,
+          0
+        );
+        ctx.rotate((textSet.rotation * Math.PI) / 180);
 
-      const letterSpacingPx = (textSet.letterSpacing || 0) * scaleForFont;
-      const maxLineWidthPx = targetWidth * ((textSet.boxWidth ?? 80) / 100);
-      const lineHeightPx = fontSizePx * (textSet.lineHeight ?? 1.2);
+        const letterSpacingPx = (textSet.letterSpacing || 0) * scaleForFont;
+        const maxLineWidthPx = targetWidth * ((textSet.boxWidth ?? 80) / 100);
+        const lineHeightPx = fontSizePx * (textSet.lineHeight ?? 1.2);
 
-      const computeLineWidth = (lineText: string) => {
-        const metricsWidth = ctx.measureText(lineText).width;
-        const extra = Math.max(0, (lineText.length - 1)) * letterSpacingPx;
-        return metricsWidth + extra;
-      };
+        const computeLineWidth = (lineText: string) => {
+          const metricsWidth = ctx.measureText(lineText).width;
+          const extra = Math.max(0, (lineText.length - 1)) * letterSpacingPx;
+          return metricsWidth + extra;
+        };
 
-      const wrapText = (fullText: string) => {
-        const paragraphs: string[] = fullText.split('\n');
-        const lines: string[] = [];
-        paragraphs.forEach((para) => {
-          const words: string[] = para.split(' ');
-          let current = '';
-          for (let i = 0; i < words.length; i++) {
-            const test = current ? current + ' ' + words[i] : words[i];
-            if (computeLineWidth(test) <= maxLineWidthPx) {
-              current = test;
-            } else {
-              if (current) lines.push(current);
-              if (computeLineWidth(words[i]) > maxLineWidthPx) {
-                let chunk = '';
-                for (const ch of words[i]) {
-                  const testChunk = chunk + ch;
-                  if (computeLineWidth(testChunk) <= maxLineWidthPx) {
-                    chunk = testChunk;
-                  } else {
-                    if (chunk) lines.push(chunk);
-                    chunk = ch as string;
-                  }
-                }
-                current = chunk;
+        const wrapText = (fullText: string) => {
+          const paragraphs: string[] = fullText.split('\n');
+          const lines: string[] = [];
+          paragraphs.forEach((para) => {
+            const words: string[] = para.split(' ');
+            let current = '';
+            for (let i = 0; i < words.length; i++) {
+              const test = current ? current + ' ' + words[i] : words[i];
+              if (computeLineWidth(test) <= maxLineWidthPx) {
+                current = test;
               } else {
-                current = words[i];
+                if (current) lines.push(current);
+                if (computeLineWidth(words[i]) > maxLineWidthPx) {
+                  let chunk = '';
+                  for (const ch of words[i]) {
+                    const testChunk = chunk + ch;
+                    if (computeLineWidth(testChunk) <= maxLineWidthPx) {
+                      chunk = testChunk;
+                    } else {
+                      if (chunk) lines.push(chunk);
+                      chunk = ch as string;
+                    }
+                  }
+                  current = chunk;
+                } else {
+                  current = words[i];
+                }
               }
             }
-          }
-          if (current) lines.push(current);
-        });
-        return lines;
-      };
-
-      const lines = wrapText(textSet.text);
-      const totalHeight = lines.length * lineHeightPx;
-      lines.forEach((line: string, idx: number) => {
-        const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
-        if (letterSpacingPx === 0) {
-          ctx.fillText(line, 0, lineY);
-        } else {
-          const chars: string[] = line.split('');
-          const totalWidth = chars.reduce((width, char, i) => {
-            const charWidth = ctx.measureText(char).width;
-            return width + charWidth + (i < chars.length - 1 ? letterSpacingPx : 0);
-          }, 0);
-          let currentX = -totalWidth / 2;
-          chars.forEach((char: string) => {
-            const charWidth = ctx.measureText(char).width;
-            ctx.fillText(char, currentX + charWidth / 2, lineY);
-            currentX += charWidth + letterSpacingPx;
+            if (current) lines.push(current);
           });
-        }
+          return lines;
+        };
+
+        const lines = wrapText(textSet.text);
+        const totalHeight = lines.length * lineHeightPx;
+        lines.forEach((line: string, idx: number) => {
+          const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
+          if (letterSpacingPx === 0) {
+            ctx.fillText(line, 0, lineY);
+          } else {
+            const chars: string[] = line.split('');
+            const totalWidth = chars.reduce((width, char, i) => {
+              const charWidth = ctx.measureText(char).width;
+              return width + charWidth + (i < chars.length - 1 ? letterSpacingPx : 0);
+            }, 0);
+            let currentX = -totalWidth / 2;
+            chars.forEach((char: string) => {
+              const charWidth = ctx.measureText(char).width;
+              ctx.fillText(char, currentX + charWidth / 2, lineY);
+              currentX += charWidth + letterSpacingPx;
+            });
+          }
+        });
+        ctx.restore();
       });
-      ctx.restore();
-    });
+    })
   };
 
   const drawOverlayCanvas = () => {
@@ -306,6 +314,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!file) return;
     // Clear any previously removed foreground immediately
     removedFgImageRef.current = null;
+    setTextSets([])
     setRemovedFgUrl(null);
     setIsReady(false);
     setSelectedVideo(file);
@@ -484,18 +493,18 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
           <div ref={outerRef} className='flex items-center gap-2 w-full'>
             <Button onClick={pickVideo} variant='secondary'>Upload video</Button>
             <Button onClick={onGenerate} disabled={!canGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
-            <div className='block md:hidden'>
+          </div>
+          <div className='block md:hidden'>
               {(remainingVideos === null) ? (
-                <p className='text-sm'>Unlimited generations</p>
+                <p className='text-sm'>Unlimited video seconds</p>
               ) : (
                 <div className='flex items-center gap-5'>
                   <p className='text-sm'>
-                    {remainingVideos} generations left
+                    {remainingVideos} video seconds left
                   </p>
                 </div>
               )}
             </div>
-          </div>
           <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!isReady || !posterUrl ? (
               <span className='flex items-center w-full gap-2 p-2'>{selectedVideo ? 'Preparing preview…' : 'Upload a video to get started'}</span>
