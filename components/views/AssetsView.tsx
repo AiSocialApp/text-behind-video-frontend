@@ -12,11 +12,19 @@ const AssetsView: React.FC = () => {
   const PAGE_SIZE = 20;
 
   const loadAssets = async (reset = false) => {
-    if (!tokens.accessToken) return;
+    const accessToken = tokens.accessToken || '';
+    if (!accessToken) return;
+    const safeTokens = {
+      accessToken: tokens.accessToken || '',
+      refreshToken: tokens.refreshToken || '',
+      expires: tokens.expires,
+      idToken: tokens.idToken || ''
+    };
+
     setIsLoading(true);
     try {
       const nextPage = reset ? 1 : page;
-      const res = await AppApi.listAssets(tokens.accessToken, { page: nextPage, limit: PAGE_SIZE });
+      const res = await AppApi.listAssets(safeTokens, { page: nextPage, limit: PAGE_SIZE });
       const newAssets = res.assets || {};
       if (reset) {
         setAssets(newAssets);
@@ -56,10 +64,10 @@ const AssetsView: React.FC = () => {
               </div>
               <div className="text-xs text-muted-foreground">Status: {a.status}</div>
               {a.media_type === 'IMAGE' && a.url && (
-                <img crossOrigin="anonymous" src={a.url} alt="Image asset" className="w-full rounded border" />
+                <img crossOrigin="anonymous" src={a.url} alt="Image asset" className="w-full rounded border max-h-300" />
               )}
               {a.media_type === 'VIDEO' && a.thumb_url && (
-                <img crossOrigin="anonymous" src={a.thumb_url} alt="Video thumbnail" className="w-full rounded border" />
+                <img crossOrigin="anonymous" src={a.thumb_url} alt="Video thumbnail" className="rounded border max-h-[300px] object-contain" />
               )}
               {a.url ? (
                 <div className="flex gap-2 items-center">

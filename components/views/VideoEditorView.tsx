@@ -344,7 +344,13 @@ const VideoEditorView: React.FC = () => {
   };
 
   const signPart = async (assetId: string, uploadId: string, key: string, partNumber: number): Promise<string> => {
-    const res = await AppApi.signMultipartPart(tokens.accessToken as string, { asset_id: assetId, s3_upload_id: uploadId, part_number: partNumber, key });
+    const safeTokens = {
+      accessToken: tokens.accessToken || '',
+      refreshToken: tokens.refreshToken || '',
+      expires: tokens.expires,
+      idToken: tokens.idToken || ''
+    };
+    const res = await AppApi.signMultipartPart(safeTokens, { asset_id: assetId, s3_upload_id: uploadId, part_number: partNumber, key });
     return (res as any).url;
   };
 
@@ -363,13 +369,25 @@ const VideoEditorView: React.FC = () => {
       if (!etag) throw new Error('Missing ETag in upload_part response');
       parts.push({ ETag: etag, PartNumber: idx });
     }
-    await AppApi.completeMultipart(tokens.accessToken as string, { asset_id: assetId, s3_upload_id: uploadId, key, parts });
+    const safeTokens = {
+      accessToken: tokens.accessToken || '',
+      refreshToken: tokens.refreshToken || '',
+      expires: tokens.expires,
+      idToken: tokens.idToken || ''
+    };
+    await AppApi.completeMultipart(safeTokens, { asset_id: assetId, s3_upload_id: uploadId, key, parts });
   };
 
   const pollAsset = async (assetId: string, { intervalMs = 5000, timeoutMs = 30 * 60 * 1000 } = {}) => {
     const start = Date.now();
     while (true) {
-      const res = await AppApi.getAsset(tokens.accessToken as string, assetId);
+      const safeTokens = {
+        accessToken: tokens.accessToken || '',
+        refreshToken: tokens.refreshToken || '',
+        expires: tokens.expires,
+        idToken: tokens.idToken || ''
+      };
+      const res = await AppApi.getAsset(safeTokens, assetId);
       const asset = (res as any).asset || res;
       const status: string | undefined = asset?.status;
       if (status === 'COMPLETE' || status === 'FAILED') return asset;
@@ -380,22 +398,35 @@ const VideoEditorView: React.FC = () => {
 
   const onGenerate = async () => {
     if (!tokens.accessToken || !selectedVideo) return;
+
     setIsGenerating(true);
     const t = toast({ title: 'Starting...', description: 'Preparing upload session.' });
     try {
-      const ext = (selectedVideo.name.split('.').pop() || 'mp4');
-      const start = await AppApi.startAsset(tokens.accessToken, { extension: ext, length: videoDurationSec });
+      const safeTokens = {
+        accessToken: tokens.accessToken || '',
+        refreshToken: tokens.refreshToken || '',
+        expires: tokens.expires,
+        idToken: tokens.idToken || ''
+      };
+      const ext = (selectedVideo.name.split('.')?.pop() || 'mp4');
+      const start = await AppApi.startAsset(safeTokens, { extension: ext, length: videoDurationSec });
       t.dismiss();
+
       const overlayCanvas = drawOverlayCanvas();
-      if (!overlayCanvas) throw new Error('Overlay canvas is not ready');
+      if (!overlayCanvas) {
+        throw new Error('Overlay canvas is not ready');
+      }
       toast({ title: 'Uploading overlay', description: 'Uploading text overlay...' });
       setIsUploading(true);
       await uploadOverlay((start as any).overlay.put_url, overlayCanvas);
+
       toast({ title: 'Uploading video', description: 'Uploading video in parts...' });
       await uploadVideoMultipart(selectedVideo, (start as any).asset_id, (start as any).video.key, (start as any).video.s3_upload_id, MIN_PART_SIZE_MB);
       setIsUploading(false);
+
       toast({ title: 'Processing', description: 'Compositing your video. This may take a while.' });
       const finalAsset = await pollAsset((start as any).asset_id);
+
       if (finalAsset?.status === 'COMPLETE') {
         toast({ title: 'Done', description: 'Your video is ready in Assets.' });
       } else if (finalAsset?.status === 'FAILED') {

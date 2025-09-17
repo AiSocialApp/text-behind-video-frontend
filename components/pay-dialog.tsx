@@ -48,39 +48,49 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
     const [isAnnual, setIsAnnual] = React.useState(false);
     
     const handleDirectToPaymentLink = async () => {
-        setLoading(true); 
-        try {
-            const accessToken = tokens.accessToken || ''
-            const portal = await AppApi.portal(accessToken, undefined, window.location.href)
-            router.push(portal.billing_portal_url)
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to create checkout session",
-                variant: "destructive"
-            });
-        } finally {
-            setLoading(false);   
-        }
-    }
+      setLoading(true);
+      try {
+        const safeTokens = {
+          accessToken: tokens.accessToken || '',
+          refreshToken: tokens.refreshToken || '',
+          expires: tokens.expires,
+          idToken: tokens.idToken || ''
+        };
+        const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+        router.push(portal.billing_portal_url);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to create checkout session",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
     const handleCancelSubscription = async () => {
-        setLoading(true);
-        try {
-            const accessToken = tokens.accessToken || ''
-            const portal = await AppApi.portal(accessToken, undefined, window.location.href)
-            router.push(portal.billing_portal_url)
-        } catch (error) {
-            console.error('Error opening billing portal:', error);
-            toast({
-                title: "Error",
-                description: "Failed to open billing portal",
-                variant: "destructive"
-            });
-        } finally {
-            setLoading(false);
-            setIsConfirmDialogOpen(false);
-        }
+      setLoading(true);
+      try {
+        const safeTokens = {
+          accessToken: tokens.accessToken || '',
+          refreshToken: tokens.refreshToken || '',
+          expires: tokens.expires,
+          idToken: tokens.idToken || ''
+        };
+        const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+        router.push(portal.billing_portal_url);
+      } catch (error) {
+        console.error('Error opening billing portal:', error);
+        toast({
+          title: "Error",
+          description: "Failed to open billing portal",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+        setIsConfirmDialogOpen(false);
+      }
     };
 
     return (
@@ -157,11 +167,16 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
   const [isAnnual, setIsAnnual] = React.useState(true);
 
   const handleDirectToPaymentLink = async () => {
-    setLoading(true); 
+    setLoading(true);
     try {
-      const accessToken = tokens.accessToken || ''
-      const portal = await AppApi.portal(accessToken, undefined, window.location.href)
-      router.push(portal.billing_portal_url)
+      const safeTokens = {
+        accessToken: tokens.accessToken || '',
+        refreshToken: tokens.refreshToken || '',
+        expires: tokens.expires,
+        idToken: tokens.idToken || ''
+      };
+      const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+      router.push(portal.billing_portal_url);
     } catch (error) {
       toast({
         title: "Error",
@@ -169,16 +184,21 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
         variant: "destructive"
       });
     } finally {
-      setLoading(false);   
+      setLoading(false);
     }
-  }
+  };
 
   const handleCancelSubscription = async () => {
     setLoading(true);
     try {
-      const accessToken = tokens.accessToken || ''
-      const portal = await AppApi.portal(accessToken, undefined, window.location.href)
-      router.push(portal.billing_portal_url)
+      const safeTokens = {
+        accessToken: tokens.accessToken || '',
+        refreshToken: tokens.refreshToken || '',
+        expires: tokens.expires,
+        idToken: tokens.idToken || ''
+      };
+      const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+      router.push(portal.billing_portal_url);
     } catch (error) {
       console.error('Error opening billing portal:', error);
       toast({

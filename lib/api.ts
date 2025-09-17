@@ -28,6 +28,23 @@ export type MeResponse = {
   remaining?: { video: number | null; image: number | null };
 };
 
+export type RefreshResponse = {
+  status: "ok";
+  id_token: string;
+  access_token: string;
+  refresh_token: string;
+  expires: number | null;
+  refreshed: boolean;
+  given_name: string | undefined;
+  family_name: string | undefined;
+  email: string;
+  username: string;
+  stripe_customer_id?: string;
+  entitlement: string;
+  allowances?: unknown;
+  remaining?: unknown;
+};
+
 const AUTH_BASE = process.env.NEXT_PUBLIC_AUTH_API_BASE || "https://auth.api.textbehindvideo.io";
 const APP_BASE = process.env.NEXT_PUBLIC_APP_API_BASE || "https://api.textbehindvideo.io";
 
@@ -39,6 +56,7 @@ export const endpoints = {
     resendCode: `${AUTH_BASE}/resend-confirmation-code/`,
     forgotPassword: `${AUTH_BASE}/forgot-password/`,
     resetPassword: `${AUTH_BASE}/reset-password/`,
+    refreshToken: `${AUTH_BASE}/refresh-token/`,
   },
   app: {
     me: `${APP_BASE}/me/`,
@@ -80,12 +98,39 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function authFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
+export async function _authFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const headers: HeadersInit = {
     ...(init?.headers || {}),
     Authorization: `Bearer ${token}`,
   };
   return apiFetch<T>(url, { ...(init || {}), headers });
+}
+
+function nearExpiry(expires: number | null): boolean {
+  if (!expires) return false;
+  const now = Math.floor(Date.now() / 1000);
+  // refresh if token is within 60 seconds of expiring
+  return expires < (now + 60);
+}
+
+export async function authFetch<T>(
+  url: string,
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expires: number | null;
+    idToken?: string;
+  },
+  init?: RequestInit
+): Promise<T> {
+  if (nearExpiry(tokens.expires)) {
+    const newTokens = await AuthApi.refreshToken(tokens.idToken || '', tokens.accessToken, tokens.refreshToken);
+    tokens.idToken = newTokens.id_token;
+    tokens.accessToken = newTokens.access_token;
+    tokens.refreshToken = newTokens.refresh_token;
+    tokens.expires = newTokens.expires;
+  }
+  return _authFetch<T>(url, tokens.accessToken, init);
 }
 
 export const AuthApi = {
@@ -131,69 +176,108 @@ export const AuthApi = {
       body: JSON.stringify({ email, reset_code, new_password }),
     });
   },
+  async refreshToken(
+    id_token: string,
+    access_token: string,
+    refresh_token: string
+  ): Promise<RefreshResponse> {
+    return apiFetch<RefreshResponse>(endpoints.auth.refreshToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_token, access_token, refresh_token }),
+    });
+  },
 };
 
 export const AppApi = {
-  async me(accessToken: string): Promise<MeResponse> {
-    return authFetch<MeResponse>(endpoints.app.me, accessToken);
+  async me(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string }
+  ): Promise<MeResponse> {
+    return authFetch<MeResponse>(endpoints.app.me, tokens);
   },
-  async portal(accessToken: string, account_id: string | undefined, return_url: string): Promise<{ billing_portal_url: string }> {
+
+  async portal(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    account_id: string | undefined,
+    return_url: string
+  ): Promise<{ billing_portal_url: string }> {
     const url = new URL(endpoints.app.portal);
-    if (account_id) url.searchParams.set("account_id", account_id);
-    url.searchParams.set("return_url", return_url);
-    return authFetch(url.toString(), accessToken);
+    if (account_id) url.searchParams.set('account_id', account_id);
+    url.searchParams.set('return_url', return_url);
+    return authFetch(url.toString(), tokens);
   },
-  async startImageAsset(accessToken: string, payload: { extension: string }): Promise<{
+
+  async startImageAsset(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    payload: { extension: string }
+  ): Promise<{
     asset_id: string;
     image: { bucket: string; key: string; put_url: string };
   }> {
-    return authFetch(endpoints.app.assetsImageStart, accessToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return authFetch(endpoints.app.assetsImageStart, tokens, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ extension: payload.extension.replace(/^\./, '') }),
     });
   },
-  async listAssets(accessToken: string, params?: { page?: number; limit?: number }): Promise<{ assets: Record<string, any> }> {
+
+  async listAssets(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    params?: { page?: number; limit?: number }
+  ): Promise<{ assets: Record<string, any> }> {
     const url = new URL(endpoints.app.assets);
-    if (params?.page) url.searchParams.set("page", String(params.page));
-    if (params?.limit) url.searchParams.set("limit", String(params.limit));
-    return authFetch(url.toString(), accessToken);
+    if (params?.page) url.searchParams.set('page', String(params.page));
+    if (params?.limit) url.searchParams.set('limit', String(params.limit));
+    return authFetch(url.toString(), tokens);
   },
-  async startAsset(accessToken: string, payload: { extension: string; length: number }): Promise<{
+
+  async startAsset(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    payload: { extension: string; length: number }
+  ): Promise<{
     asset_id: string;
     overlay: { bucket: string; key: string; put_url: string };
     video: { bucket: string; key: string; s3_upload_id: string };
   }> {
-    return authFetch(endpoints.app.assetsStart, accessToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extension: payload.extension.replace(/^\./, ''), length: Math.max(0, Math.floor(payload.length)) }),
+    return authFetch(endpoints.app.assetsStart, tokens, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        extension: payload.extension.replace(/^\./, ''),
+        length: Math.max(0, Math.floor(payload.length)),
+      }),
     });
   },
+
   async signMultipartPart(
-    accessToken: string,
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
     params: { asset_id: string; s3_upload_id: string; part_number: number; key: string }
   ): Promise<{ url: string }> {
     const url = new URL(endpoints.app.uploadSign);
-    url.searchParams.set("asset_id", params.asset_id);
-    url.searchParams.set("s3_upload_id", params.s3_upload_id);
-    url.searchParams.set("part_number", String(params.part_number));
-    url.searchParams.set("key", params.key);
-    return authFetch(url.toString(), accessToken);
+    url.searchParams.set('asset_id', params.asset_id);
+    url.searchParams.set('s3_upload_id', params.s3_upload_id);
+    url.searchParams.set('part_number', String(params.part_number));
+    url.searchParams.set('key', params.key);
+    return authFetch(url.toString(), tokens);
   },
+
   async completeMultipart(
-    accessToken: string,
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
     payload: { asset_id: string; s3_upload_id: string; key: string; parts: Array<{ ETag: string; PartNumber: number }> }
   ): Promise<{ status: string }> {
-    return authFetch(endpoints.app.uploadComplete, accessToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return authFetch(endpoints.app.uploadComplete, tokens, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   },
-  async getAsset(accessToken: string, asset_id: string): Promise<{ asset: Record<string, unknown> }> {
+
+  async getAsset(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    asset_id: string
+  ): Promise<{ asset: Record<string, unknown> }> {
     const url = `${endpoints.app.assets}${encodeURIComponent(asset_id)}/`;
-    return authFetch(url, accessToken);
+    return authFetch(url, tokens);
   },
 };
 
