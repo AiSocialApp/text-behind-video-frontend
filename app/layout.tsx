@@ -11,8 +11,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Text Behind Image",
-  description: "Create text behind image designs",
+  title: "Text Behind Video",
+  description: "Create text behind video designs",
 };
 
 export default function RootLayout({
