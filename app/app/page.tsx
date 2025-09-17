@@ -365,10 +365,21 @@ const Page = () => {
         // Upload to backend
         try {
             const blob: Blob = await new Promise((resolve) => canvas.toBlob(b => resolve(b as Blob), 'image/png'));
+
             const ext = 'png';
-            const start = await import('@/lib/api').then(m => m.AppApi.startImageAsset(tokens.accessToken as string, { extension: ext }));
+            const safeTokens = {
+              accessToken: tokens.accessToken || '',
+              refreshToken: tokens.refreshToken || '',
+              expires: tokens.expires,
+              idToken: tokens.idToken || ''
+            };
+            const start = await import('@/lib/api').then(m => m.AppApi.startImageAsset(safeTokens, { extension: ext }));
             const putUrl = (start as any).image.put_url as string;
-            await fetch(putUrl, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: blob });
+            await fetch(putUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'image/png' },
+              body: blob
+            });
         } catch (e) {
             console.error('Image upload failed', e);
         }
@@ -409,8 +420,8 @@ const Page = () => {
                                             <p className='text-sm'>
                                                 {remainingImages} generations left
                                             </p>
-                                            <Button 
-                                                variant="link" 
+                                            <Button
+                                                variant="link"
                                                 className="p-0 h-auto text-sm text-primary hover:underline"
                                                 onClick={() => setIsPayDialogOpen(true)}
                                             >

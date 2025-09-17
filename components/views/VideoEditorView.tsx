@@ -40,8 +40,8 @@ const VideoEditorView: React.FC = () => {
   const canGenerate = useMemo(() => {
     const hasUnlimited = remainingVideos === null;
     const hasRemaining = (remainingVideos ?? 0) > 0;
-    return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating && !isUploading);
-  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating, isUploading]);
+    return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating);
+  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating]);
 
   const addNewTextSet = () => {
     const newId = Math.max(0, ...textSets.map((s: any) => s.id)) + 1;
@@ -411,6 +411,7 @@ const VideoEditorView: React.FC = () => {
       const ext = (selectedVideo.name.split('.')?.pop() || 'mp4');
       const start = await AppApi.startAsset(safeTokens, { extension: ext, length: videoDurationSec });
       t.dismiss();
+      setIsGenerating(false);
 
       const overlayCanvas = drawOverlayCanvas();
       if (!overlayCanvas) {
@@ -435,8 +436,8 @@ const VideoEditorView: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       toast({ title: 'Error', description: err?.message || 'Generation failed.' });
-    } finally {
       setIsGenerating(false);
+    } finally {
       setIsUploading(false);
     }
   };

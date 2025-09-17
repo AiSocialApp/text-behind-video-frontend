@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PlusIcon, ReloadIcon } from '@radix-ui/react-icons';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +42,19 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     duplicateTextSet,
     currentUser,
 }) => {
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSaveClick = async () => {
+        setIsSaving(true);
+        try {
+            await saveCompositeImage();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <>
             <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-10rem)] md:h-[calc(100vh-5rem)] px-10 mt-2'>
@@ -50,8 +63,8 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
                     <div ref={outerRef} className='flex items-center gap-2 w-full'>
                         <Button onClick={onUploadImage} variant='secondary'>Upload image</Button>
                         <Button 
-                            onClick={saveCompositeImage}
-                            disabled={!selectedImage || !(remainingImages === null || (remainingImages ?? 0) > 0)}
+                            onClick={handleSaveClick}
+                            disabled={isSaving || !selectedImage || !(remainingImages === null || (remainingImages ?? 0) > 0)}
                         >
                             Save image
                         </Button>
