@@ -9,18 +9,38 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import TextCustomizer from '@/components/editor/text-customizer';
 
-// We'll remove all existing props, and replicate the pattern from VideoEditorView.
+interface ImageEditorViewProps {
+  selectedImage: string | null;
+  setSelectedImage: React.Dispatch<React.SetStateAction<string | null>>;
+  isImageSetupDone: boolean;
+  setIsImageSetupDone: React.Dispatch<React.SetStateAction<boolean>>;
+  removedBgImageUrl: string | null;
+  setRemovedBgImageUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  textSets: Array<any>;
+  setTextSets: React.Dispatch<React.SetStateAction<Array<any>>>;
+  imageNaturalSize: { width: number; height: number};
+  setImageNaturalSize: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
+  displayedSize: { width: number; height: number};
+  setDisplayedSize: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
+}
 
-const ImageEditorView: React.FC = () => {
+const ImageEditorView: React.FC<ImageEditorViewProps> = ({
+  selectedImage,
+  setSelectedImage,
+  isImageSetupDone,
+  setIsImageSetupDone,
+  removedBgImageUrl,
+  setRemovedBgImageUrl,
+  textSets,
+  setTextSets,
+  imageNaturalSize,
+  setImageNaturalSize,
+  displayedSize,
+  setDisplayedSize,
+}) => {
   const { tokens, profile } = useAuth();
 
   // We'll replicate relevant states that were in page.tsx.
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isImageSetupDone, setIsImageSetupDone] = useState<boolean>(false);
-  const [removedBgImageUrl, setRemovedBgImageUrl] = useState<string | null>(null);
-  const [textSets, setTextSets] = useState<Array<any>>([]);
-  const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);

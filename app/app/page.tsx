@@ -38,6 +38,24 @@ const Page = () => {
     const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('video');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+    const [imageSelectedImage, setImageSelectedImage] = useState<string | null>(null);
+    const [imageIsSetupDone, setImageIsSetupDone] = useState<boolean>(false);
+    const [imageRemovedBgImageUrl, setImageRemovedBgImageUrl] = useState<string | null>(null);
+    const [imageTextSets, setImageTextSets] = useState<Array<any>>([]);
+    const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [imageDisplayedSize, setImageDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+    const [videoSelectedVideo, setVideoSelectedVideo] = useState<File | null>(null);
+    const [videoPosterUrl, setVideoPosterUrl] = useState<string | null>(null);
+    const [videoDurationSec, setVideoDurationSec] = useState<number>(0);
+    const [videoRemovedFgUrl, setVideoRemovedFgUrl] = useState<string | null>(null);
+    const [videoNaturalSize, setVideoNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [videoDisplayedSize, setVideoDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [videoIsReady, setVideoIsReady] = useState<boolean>(false);
+    const [videoIsGenerating, setVideoIsGenerating] = useState<boolean>(false);
+    const [videoIsUploading, setVideoIsUploading] = useState<boolean>(false);
+    const [videoTextSets, setVideoTextSets] = useState<any[]>([]);
+
     const getCurrentUser = async () => {
         if (!profile) return;
         // Map MeResponse to local Profile shape; minimal fields used here
@@ -128,10 +146,44 @@ const Page = () => {
                         />
                         <div className='flex-1'>
                             {activeView === 'image' && (
-                                <ImageEditorView />
+                                <ImageEditorView
+                                    selectedImage={imageSelectedImage}
+                                    setSelectedImage={setImageSelectedImage}
+                                    isImageSetupDone={imageIsSetupDone}
+                                    setIsImageSetupDone={setImageIsSetupDone}
+                                    removedBgImageUrl={imageRemovedBgImageUrl}
+                                    setRemovedBgImageUrl={setImageRemovedBgImageUrl}
+                                    textSets={imageTextSets}
+                                    setTextSets={setImageTextSets}
+                                    imageNaturalSize={imageNaturalSize}
+                                    setImageNaturalSize={setImageNaturalSize}
+                                    displayedSize={imageDisplayedSize}
+                                    setDisplayedSize={setImageDisplayedSize}
+                                />
                             )}
                             {activeView === 'video' && (
-                                <VideoEditorView />
+                                <VideoEditorView
+                                    selectedVideo={videoSelectedVideo}
+                                    setSelectedVideo={setVideoSelectedVideo}
+                                    posterUrl={videoPosterUrl}
+                                    setPosterUrl={setVideoPosterUrl}
+                                    videoDurationSec={videoDurationSec}
+                                    setVideoDurationSec={setVideoDurationSec}
+                                    removedFgUrl={videoRemovedFgUrl}
+                                    setRemovedFgUrl={setVideoRemovedFgUrl}
+                                    naturalSize={videoNaturalSize}
+                                    setNaturalSize={setVideoNaturalSize}
+                                    displayedSize={videoDisplayedSize}
+                                    setDisplayedSize={setVideoDisplayedSize}
+                                    isReady={videoIsReady}
+                                    setIsReady={setVideoIsReady}
+                                    isGenerating={videoIsGenerating}
+                                    setIsGenerating={setVideoIsGenerating}
+                                    isUploading={videoIsUploading}
+                                    setIsUploading={setVideoIsUploading}
+                                    textSets={videoTextSets}
+                                    setTextSets={setVideoTextSets}
+                                />
                             )}
                             {activeView === 'assets' && (
                                 <AssetsView />

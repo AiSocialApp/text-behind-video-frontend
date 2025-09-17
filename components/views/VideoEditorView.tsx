@@ -12,19 +12,52 @@ import { removeBackground } from '@imgly/background-removal';
 
 const MIN_PART_SIZE_MB = 8;
 
-const VideoEditorView: React.FC = () => {
-  const { tokens, profile } = useAuth();
+interface VideoEditorViewProps {
+  selectedVideo: File | null;
+  setSelectedVideo: React.Dispatch<React.SetStateAction<File | null>>;
+  posterUrl: string | null;
+  setPosterUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  videoDurationSec: number;
+  setVideoDurationSec: React.Dispatch<React.SetStateAction<number>>;
+  removedFgUrl: string | null;
+  setRemovedFgUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  naturalSize: { width: number; height: number };
+  setNaturalSize: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
+  displayedSize: { width: number; height: number };
+  setDisplayedSize: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
+  isReady: boolean;
+  setIsReady: React.Dispatch<React.SetStateAction<boolean>>;
+  isGenerating: boolean;
+  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
+  isUploading: boolean;
+  setIsUploading: React.Dispatch<React.SetStateAction<boolean>>;
+  textSets: any[];
+  setTextSets: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
-  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  const [posterUrl, setPosterUrl] = useState<string | null>(null);
-  const [videoDurationSec, setVideoDurationSec] = useState<number>(0);
-  const [removedFgUrl, setRemovedFgUrl] = useState<string | null>(null);
-  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [isReady, setIsReady] = useState<boolean>(false);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [textSets, setTextSets] = useState<any[]>([]);
+const VideoEditorView: React.FC<VideoEditorViewProps> = ({
+  selectedVideo,
+  setSelectedVideo,
+  posterUrl,
+  setPosterUrl,
+  videoDurationSec,
+  setVideoDurationSec,
+  removedFgUrl,
+  setRemovedFgUrl,
+  naturalSize,
+  setNaturalSize,
+  displayedSize,
+  setDisplayedSize,
+  isReady,
+  setIsReady,
+  isGenerating,
+  setIsGenerating,
+  isUploading,
+  setIsUploading,
+  textSets,
+  setTextSets,
+}) => {
+  const { tokens, profile } = useAuth();
 
   const outerRef = useRef<HTMLDivElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
