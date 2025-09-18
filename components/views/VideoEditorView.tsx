@@ -79,15 +79,18 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating);
   }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating]);
 
-  const canSelect1080 = useMemo(() => {
+  const [canSelect1080, canSelect2160] = useMemo(() => {
     const minDim = Math.min(naturalSize.width, naturalSize.height);
-    return minDim >= 1080; // allow 1080 if short side >= 1080
+    const canSelect1080 = minDim >= 1080; // allow 1080 if short side >= 1080
+    const canSelect2160 = minDim >= 2160;
+    if (!canSelect1080) {
+      setSelectedResolution(720)
+    } else if (!canSelect2160 && selectedResolution > 1080) {
+      setSelectedResolution(1080)
+    }
+    return [canSelect1080, canSelect2160]
   }, [naturalSize]);
 
-  const canSelect2160 = useMemo(() => {
-    const minDim = Math.min(naturalSize.width, naturalSize.height);
-    return minDim >= 2160; // allow 4K if short side >= 2160
-  }, [naturalSize]);
 
   const resolutionLimitMsg = useMemo(() => {
     const minDim = Math.min(naturalSize.width, naturalSize.height);
@@ -141,25 +144,41 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   useEffect(() => {
     if (!posterUrl) return;
     if (!previewCanvasRef.current) return;
-    const img = new (window as any).Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = async () => {
-      if (!previewCanvasRef.current) return;
-      const canvas = previewCanvasRef.current;
-      canvas.width = displayedSize.width || 1;
-      canvas.height = displayedSize.height || 1;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
-      await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
-      // Foreground (subject) on top
-      if (removedFgImageRef.current) {
-        ctx.drawImage(removedFgImageRef.current, 0, 0, canvas.width, canvas.height);
+    (async () => {
+      try {
+        // Async loader that awaits the image decode before returning
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const tempImg = new (window as any).Image();
+          tempImg.crossOrigin = 'anonymous';
+          tempImg.onload = () => {
+            if (tempImg.decode) {
+              tempImg.decode().then(() => resolve(tempImg)).catch(reject);
+            } else {
+              // Fallback for older browsers
+              resolve(tempImg);
+            }
+          };
+          tempImg.onerror = reject;
+          tempImg.src = posterUrl;
+        });
+        if (!previewCanvasRef.current) return;
+        const canvas = previewCanvasRef.current;
+        canvas.width = displayedSize.width || 1;
+        canvas.height = displayedSize.height || 1;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
+        await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
+        // Foreground (subject) on top
+        if (removedFgImageRef.current) {
+          ctx.drawImage(removedFgImageRef.current, 0, 0, canvas.width, canvas.height);
+        }
+      } catch (err) {
+        console.warn('Failed to load or decode image', err);
       }
-    };
-    img.src = posterUrl;
+    })();
   }, [posterUrl, displayedSize.width, displayedSize.height, JSON.stringify(textSets)]);
 
   // Load removed foreground image element when URL ready
