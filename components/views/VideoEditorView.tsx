@@ -12,6 +12,15 @@ import { removeBackground } from '@imgly/background-removal';
 
 const MIN_PART_SIZE_MB = 8;
 
+// Debug logging helper
+const DEBUG_LOGGING_ENABLED = false;
+const debugLog = (...args: any[]) => {
+  if (DEBUG_LOGGING_ENABLED) {
+    // eslint-disable-next-line no-console
+    console.log('[TBV]', ...args);
+  }
+};
+
 interface VideoEditorViewProps {
   selectedVideo: File | null;
   setSelectedVideo: React.Dispatch<React.SetStateAction<File | null>>;
@@ -63,11 +72,14 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const [selectedResolution, setSelectedResolution] = useState<number>(720);
 
   const outerRef = useRef<HTMLDivElement>(null);
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const textCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenVideoRef = useRef<HTMLVideoElement>(null);
   const removedFgImageRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentFileRef = useRef<File | null>(null);
 
   const remainingVideos = useMemo(() => profile?.remaining?.video ?? null, [profile]);
   const isPaid = useMemo(() => (profile ? profile.entitlement !== 'starter' : false), [profile]);
@@ -136,26 +148,33 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const updatePreviewScale = () => {
     if (!outerRef.current || naturalSize.width === 0 || naturalSize.height === 0) return;
     const rect = outerRef.current.getBoundingClientRect();
-    const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 200));
+    const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 220));
     const scale = Math.min(rect.width / naturalSize.width, maxPreviewHeight / naturalSize.height);
     const targetWidth = Math.max(1, Math.floor(naturalSize.width * scale));
     const targetHeight = Math.max(1, Math.floor(naturalSize.height * scale));
+    debugLog('updatePreviewScale', { rectWidth: rect.width, rectHeight: rect.height, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
     setDisplayedSize({ width: targetWidth, height: targetHeight });
   };
 
   useEffect(() => {
     const onResize = () => updatePreviewScale();
     window.addEventListener('resize', onResize);
-    updatePreviewScale();
+    // Defer initial scale until container is laid out
+    requestAnimationFrame(() => updatePreviewScale());
     return () => window.removeEventListener('resize', onResize);
   }, [naturalSize.width, naturalSize.height]);
 
+  // Draw background layer (poster)
   useEffect(() => {
     if (!posterUrl) return;
-    if (!previewCanvasRef.current) return;
+    if (!bgCanvasRef.current) return;
+    if (!displayedSize.width || !displayedSize.height) {
+      debugLog('BG draw skipped (displayedSize not ready)', displayedSize);
+      return;
+    }
     (async () => {
       try {
-        // Async loader that awaits the image decode before returning
+        debugLog('BG draw start', { posterUrl, displayedSize });
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const tempImg = new (window as any).Image();
           tempImg.crossOrigin = 'anonymous';
@@ -163,75 +182,77 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
             if (tempImg.decode) {
               tempImg.decode().then(() => resolve(tempImg)).catch(reject);
             } else {
-              // Fallback for older browsers
               resolve(tempImg);
             }
           };
           tempImg.onerror = reject;
           tempImg.src = posterUrl;
         });
-        if (!previewCanvasRef.current) return;
-        const canvas = previewCanvasRef.current;
+        if (!bgCanvasRef.current) return;
+        const canvas = bgCanvasRef.current;
         canvas.width = displayedSize.width || 1;
         canvas.height = displayedSize.height || 1;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
-        await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
-        // Foreground (subject) on top
-        if (removedFgImageRef.current) {
-          ctx.drawImage(removedFgImageRef.current, 0, 0, canvas.width, canvas.height);
-        }
+        debugLog('BG draw complete', { canvasWidth: canvas.width, canvasHeight: canvas.height });
       } catch (err) {
-        console.warn('Failed to load or decode image', err);
+        console.warn('[TBV] Failed to load or decode background image', err);
       }
     })();
-  }, [posterUrl, displayedSize.width, displayedSize.height, JSON.stringify(textSets)]);
+  }, [posterUrl, displayedSize.width, displayedSize.height]);
 
-  // Load removed foreground image element when URL ready
+  // Draw text layer
   useEffect(() => {
-    if (!removedFgUrl) {
-      removedFgImageRef.current = null;
-      // trigger redraw without foreground
-      if (previewCanvasRef.current && displayedSize.width && displayedSize.height && posterUrl) {
-        const img = new (window as any).Image();
-        img.onload = async () => {
-          const canvas = previewCanvasRef.current!;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
-          await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
-        };
-        img.src = posterUrl;
-      }
+    if (!textCanvasRef.current) return;
+    if (!displayedSize.width || !displayedSize.height) {
+      debugLog('TEXT draw skipped (displayedSize not ready)', displayedSize);
       return;
     }
+    const canvas = textCanvasRef.current;
+    canvas.width = displayedSize.width || 1;
+    canvas.height = displayedSize.height || 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
+    (async () => {
+      debugLog('TEXT draw start', { textSetCount: textSets.length, canvasWidth: canvas.width, canvasHeight: canvas.height, scaleForFont });
+      await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
+      debugLog('TEXT draw complete');
+    })();
+  }, [JSON.stringify(textSets), displayedSize.width, displayedSize.height, naturalSize.width]);
+
+  // Load removed foreground image element when URL ready
+  // Draw foreground layer
+  useEffect(() => {
+    if (!fgCanvasRef.current) return;
+    if (!displayedSize.width || !displayedSize.height) {
+      debugLog('FG draw skipped (displayedSize not ready)', displayedSize);
+      return;
+    }
+    const canvas = fgCanvasRef.current;
+    canvas.width = displayedSize.width || 1;
+    canvas.height = displayedSize.height || 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!removedFgUrl) {
+      removedFgImageRef.current = null;
+      debugLog('FG cleared (no removedFgUrl)');
+      return;
+    }
+    debugLog('FG draw start', { removedFgUrl, canvasWidth: canvas.width, canvasHeight: canvas.height });
     const img = new (window as any).Image();
     img.crossOrigin = 'anonymous';
-    img.onload = async () => {
+    img.onload = () => {
       removedFgImageRef.current = img;
-      // redraw to include foreground
-      if (previewCanvasRef.current && displayedSize.width && displayedSize.height && posterUrl) {
-        const bg = new (window as any).Image();
-        bg.onload = async () => {
-          const canvas = previewCanvasRef.current!;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-          const scaleForFont = naturalSize.width > 0 ? canvas.width / naturalSize.width : 1;
-          await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        };
-        bg.src = posterUrl;
-      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      debugLog('FG draw complete');
     };
     img.src = removedFgUrl;
-  }, [removedFgUrl, posterUrl, displayedSize.width, displayedSize.height, naturalSize.width]);
+  }, [removedFgUrl, displayedSize.width, displayedSize.height]);
 
   const drawTextSets = async (
     ctx: CanvasRenderingContext2D,
@@ -239,6 +260,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     targetHeight: number,
     scaleForFont: number
   ) => {
+    debugLog('drawTextSets start', { count: textSets.length, targetWidth, targetHeight, scaleForFont });
     await Promise.all(
       textSets.map((textSet) => {
         const fontSizePx = textSet.fontSize * scaleForFont;
@@ -246,7 +268,9 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         return document.fonts.load(fontStr);
       })
     );
-    textSets.forEach((textSet: any) => {
+    debugLog('Fonts loaded for text sets');
+    textSets.forEach((textSet: any, index: number) => {
+      debugLog('drawTextSet', { index, id: textSet.id, text: textSet.text });
       ctx.save();
       const fontSizePx = textSet.fontSize * scaleForFont;
       ctx.font = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
@@ -317,6 +341,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 
       const lines = wrapText(textSet.text);
       const totalHeight = lines.length * lineHeightPx;
+      debugLog('text layout', { id: textSet.id, lines: lines.length, totalHeight });
       lines.forEach((line: string, idx: number) => {
         const lineY = -((totalHeight - lineHeightPx) / 2) + idx * lineHeightPx;
         if (letterSpacingPx === 0) {
@@ -337,6 +362,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       });
       ctx.restore();
     });
+    debugLog('drawTextSets complete');
   };
 
   const drawOverlayCanvas = async () => {
@@ -365,36 +391,60 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       toast({ title: 'Limit reached', description: 'You have reached your video generation limit.' });
       return;
     }
+    debugLog('pickVideo clicked', { hasUnlimited, hasRemaining, remainingVideos });
     fileInputRef.current?.click();
   };
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Clear any previously removed foreground immediately
+    debugLog('onFileChange', { name: file.name, size: file.size, type: file.type });
+
+    // Clear old removed foreground references
     removedFgImageRef.current = null;
-    setTextSets([])
     setRemovedFgUrl(null);
+    setTextSets([]);
     setIsReady(false);
-    setSelectedVideo(file);
+
+    // Use a local reference to detect if the file changed mid-processing
+    const localFile = file;
+    setSelectedVideo(localFile);
+    currentFileRef.current = localFile;
+
     try {
-      const { poster, width, height, duration } = await extractPosterAndDuration(file);
+      debugLog('extractPosterAndDuration start');
+      const { poster, width, height, duration } = await extractPosterAndDuration(localFile);
+      debugLog('extractPosterAndDuration result', { width, height, duration });
       setPosterUrl(poster);
       setNaturalSize({ width, height });
       setVideoDurationSec(Math.max(0, Math.round(duration)));
       setIsReady(true);
       updatePreviewScale();
-      // Kick off background removal of poster to get foreground cutout
+
+      // Attempt background removal
       try {
+        debugLog('removeBackground start');
         const fgBlob = await removeBackground(poster);
+        // Check if user changed the file since we started removal
+        if (currentFileRef.current !== localFile) {
+          debugLog('removeBackground aborted (file changed via ref)');
+          return;
+        }
         const url = URL.createObjectURL(fgBlob);
         setRemovedFgUrl(url);
+
+        // Reinitialize the removedFgImageRef to the new image
+        const newImage = new Image();
+        newImage.src = url;
+        removedFgImageRef.current = newImage;
+        debugLog('removeBackground complete', { url });
       } catch (e) {
-        console.warn('Background removal failed', e);
+        console.warn('[TBV] Background removal failed', e);
         setRemovedFgUrl(null);
+        removedFgImageRef.current = null;
       }
     } catch (err) {
-      console.error(err);
+      console.error('[TBV] extractPosterAndDuration error', err);
       toast({ title: 'Failed to load video', description: 'Could not extract preview from video.' });
     }
   };
@@ -407,6 +457,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       video.src = URL.createObjectURL(file);
       const cleanup = () => URL.revokeObjectURL(video.src);
       video.onloadedmetadata = () => {
+        debugLog('video metadata loaded', { videoWidth: video.videoWidth, videoHeight: video.videoHeight, duration: video.duration });
         const width = video.videoWidth;
         const height = video.videoHeight;
         const duration = video.duration || 0;
@@ -421,9 +472,11 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
             ctx.drawImage(video, 0, 0, width, height);
             const poster = canvas.toDataURL('image/png');
             cleanup();
+            debugLog('poster captured');
             resolve({ poster, width, height, duration });
           } catch (e) {
             cleanup();
+            debugLog('poster capture error', e);
             reject(e);
           }
         };
@@ -433,18 +486,23 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       };
       video.onerror = () => {
         cleanup();
-        reject(new Error('Failed to load video metadata'));
+        const err = new Error('Failed to load video metadata');
+        debugLog('video metadata error', err);
+        reject(err);
       };
     });
   };
 
   const uploadOverlay = async (putUrl: string, canvas: HTMLCanvasElement) => {
+    debugLog('uploadOverlay start', { putUrl: Boolean(putUrl), canvasWidth: canvas.width, canvasHeight: canvas.height });
     const blob: Blob = await new Promise((resolve) => canvas.toBlob(b => resolve(b as Blob), 'image/png'));
     const resp = await fetch(putUrl, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: blob });
     if (!resp.ok) throw new Error(`Overlay upload failed: ${resp.status}`);
+    debugLog('uploadOverlay complete');
   };
 
   const signPart = async (assetId: string, uploadId: string, key: string, partNumber: number): Promise<string> => {
+    debugLog('signPart', { assetId, uploadId, key, partNumber });
     const safeTokens = {
       accessToken: tokens.accessToken || '',
       refreshToken: tokens.refreshToken || '',
@@ -458,6 +516,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const uploadVideoMultipart = async (file: File, assetId: string, key: string, uploadId: string, partSizeMb: number = MIN_PART_SIZE_MB) => {
     const partSize = Math.max(5, partSizeMb) * 1024 * 1024;
     const totalParts = Math.ceil(file.size / partSize);
+    debugLog('uploadVideoMultipart start', { fileSize: file.size, partSize, totalParts });
     const parts: Array<{ ETag: string; PartNumber: number }> = [];
     for (let idx = 1; idx <= totalParts; idx++) {
       const start = (idx - 1) * partSize;
@@ -469,6 +528,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       const etag = putResp.headers.get('ETag') || putResp.headers.get('etag');
       if (!etag) throw new Error('Missing ETag in upload_part response');
       parts.push({ ETag: etag, PartNumber: idx });
+      debugLog('upload part complete', { idx, etag });
     }
     const safeTokens = {
       accessToken: tokens.accessToken || '',
@@ -477,6 +537,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       idToken: tokens.idToken || ''
     };
     await AppApi.completeMultipart(safeTokens, { asset_id: assetId, s3_upload_id: uploadId, key, parts });
+    debugLog('completeMultipart called', { partsCount: parts.length });
   };
 
   const pollAsset = async (assetId: string, { intervalMs = 5000, timeoutMs = 30 * 60 * 1000 } = {}) => {
@@ -491,6 +552,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       const res = await AppApi.getAsset(safeTokens, assetId);
       const asset = (res as any).asset || res;
       const status: string | undefined = asset?.status;
+      debugLog('pollAsset status', { status });
       if (status === 'COMPLETE' || status === 'FAILED') return asset;
       if (Date.now() - start > timeoutMs) throw new Error('Timed out waiting for asset completion');
       await new Promise(r => setTimeout(r, intervalMs));
@@ -510,16 +572,19 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         idToken: tokens.idToken || ''
       };
       const ext = (selectedVideo.name.split('.')?.pop() || 'mp4');
+      debugLog('startAsset call', { ext, videoDurationSec, selectedResolution });
       const start = await AppApi.startAsset(safeTokens, {
         extension: ext,
         length: videoDurationSec,
         resolution: selectedResolution,
       });
+      debugLog('startAsset response', start);
       t.dismiss();
       setIsGenerating(false);
 
       const overlayCanvas = await drawOverlayCanvas();
       if (!overlayCanvas) {
+        debugLog('overlayCanvas not ready');
         throw new Error('Overlay canvas is not ready');
       }
       toast({ title: 'Uploading overlay', description: 'Uploading text overlay...' });
@@ -539,7 +604,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         toast({ title: 'Failed', description: 'Video processing failed.' });
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('[TBV] onGenerate error', err);
       toast({ title: 'Error', description: err?.message || 'Generation failed.' });
       setIsGenerating(false);
     } finally {
@@ -553,7 +618,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-8rem)] px-2 md:px-10 mt-2'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-2">
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
-          <div ref={outerRef} className='flex items-center gap-2 w-full'>
+          <div className='flex items-center gap-2 w-full'>
             <Button onClick={pickVideo} variant='secondary'>Upload video</Button>
             <Button onClick={onGenerate} disabled={!canGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
           </div>
@@ -620,16 +685,30 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               </div>
             )}
           </div>
-          <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
+          <div ref={outerRef} className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!isReady || !posterUrl ? (
               <span className='flex items-center w-full gap-2 p-2'>{selectedVideo ? 'Preparing preview…' : 'Upload a video to get started'}</span>
             ) : (
-              <canvas
-                ref={previewCanvasRef}
-                width={displayedSize.width}
-                height={displayedSize.height}
-                style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}
-              />
+              <div style={{ position: 'relative', width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}>
+                <canvas
+                  ref={bgCanvasRef}
+                  width={displayedSize.width}
+                  height={displayedSize.height}
+                  style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}
+                />
+                <canvas
+                  ref={textCanvasRef}
+                  width={displayedSize.width}
+                  height={displayedSize.height}
+                  style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px`, position: 'absolute', top: 0, left: 0, zIndex: 1, pointerEvents: 'none' }}
+                />
+                <canvas
+                  ref={fgCanvasRef}
+                  width={displayedSize.width}
+                  height={displayedSize.height}
+                  style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px`, position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'none' }}
+                />
+              </div>
             )}
           </div>
           {profile && profile.entitlement === 'starter' && (
