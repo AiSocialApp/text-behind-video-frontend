@@ -113,14 +113,32 @@ function nearExpiry(expires: number | null): boolean {
   return expires < (now + 60);
 }
 
+export type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+  expires: number | null;
+  idToken?: string;
+};
+
+let onTokensRefreshed: ((tokens: {
+  idToken: string;
+  accessToken: string;
+  refreshToken: string;
+  expires: number | null;
+}) => void) | null = null;
+
+export function setOnTokensRefreshed(handler?: (tokens: {
+  idToken: string;
+  accessToken: string;
+  refreshToken: string;
+  expires: number | null;
+}) => void) {
+  onTokensRefreshed = handler || null;
+}
+
 export async function authFetch<T>(
   url: string,
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-    expires: number | null;
-    idToken?: string;
-  },
+  tokens: AuthTokens,
   init?: RequestInit
 ): Promise<T> {
   if (nearExpiry(tokens.expires)) {
@@ -129,6 +147,14 @@ export async function authFetch<T>(
     tokens.accessToken = newTokens.access_token;
     tokens.refreshToken = newTokens.refresh_token;
     tokens.expires = newTokens.expires;
+    if (onTokensRefreshed) {
+      onTokensRefreshed({
+        idToken: newTokens.id_token,
+        accessToken: newTokens.access_token,
+        refreshToken: newTokens.refresh_token,
+        expires: newTokens.expires,
+      });
+    }
   }
   return _authFetch<T>(url, tokens.accessToken, init);
 }

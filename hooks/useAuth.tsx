@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { AuthApi, AppApi, LoginResponse, MeResponse } from "@/lib/api";
+import { AuthApi, AppApi, LoginResponse, MeResponse, setOnTokensRefreshed } from "@/lib/api";
 
 type AuthContextType = {
   isLoading: boolean;
@@ -57,6 +57,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [tokens, profile]);
 
+  // Persist refreshed tokens coming from api layer
+  useEffect(() => {
+    setOnTokensRefreshed((t) => {
+      setTokens({
+        idToken: t.idToken,
+        accessToken: t.accessToken,
+        refreshToken: t.refreshToken,
+        expires: t.expires,
+      });
+    });
+    return () => setOnTokensRefreshed(undefined);
+  }, []);
+
   const isAuthenticated = Boolean(tokens.accessToken);
 
   const login = async (email: string, password: string) => {
@@ -69,7 +82,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshToken: res.refresh_token,
         expires: res.expires,
       });
-      const me = await AppApi.me(res.access_token);
+      const me = await AppApi.me({
+        accessToken: res.access_token,
+        refreshToken: res.refresh_token,
+        expires: res.expires,
+        idToken: res.id_token,
+      });
       setProfile(me);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(
