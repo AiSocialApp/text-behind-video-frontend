@@ -6,6 +6,7 @@ export interface Profile {
     images_generated: number;
     paid: boolean;
     subscription_id: string;
+    entitlement?: string;
 }
 
 export interface Design {

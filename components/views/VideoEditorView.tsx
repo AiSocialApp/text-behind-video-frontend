@@ -42,6 +42,7 @@ interface VideoEditorViewProps {
   setIsUploading: React.Dispatch<React.SetStateAction<boolean>>;
   textSets: any[];
   setTextSets: React.Dispatch<React.SetStateAction<any[]>>;
+  openPayDialog: () => void;
 }
 
 const VideoEditorView: React.FC<VideoEditorViewProps> = ({
@@ -65,6 +66,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   setIsUploading,
   textSets,
   setTextSets,
+  openPayDialog,
 }) => {
   const { tokens, profile } = useAuth();
 
@@ -83,6 +85,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 
   const remainingVideos = useMemo(() => profile?.remaining?.video ?? null, [profile]);
   const isPaid = useMemo(() => (profile ? profile.entitlement !== 'starter' : false), [profile]);
+  const isPro = useMemo(() => profile?.entitlement === 'pro', [profile]);
   const userId = profile?.username ?? '';
 
   const canGenerate = useMemo(() => {
@@ -109,6 +112,12 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     }
     return [canSelect1080, canSelect1440, canSelect2160];
   }, [naturalSize, selectedResolution, selectedVideo]);
+
+  useEffect(() => {
+    if (!isPro && selectedResolution > 720) {
+      setSelectedResolution(720);
+    }
+  }, [isPro, selectedResolution]);
 
 
   const resolutionLimitMsg = useMemo(() => {
@@ -623,7 +632,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
             <Button onClick={onGenerate} disabled={!canGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
           </div>
           {/* Add resolution selection radio buttons here */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 text-sm flex-wrap sm:text-base">
             <label className="flex items-center gap-1">
               <input
                 type="radio"
@@ -634,39 +643,61 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               />
               720p
             </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="resolution"
-                value="1080"
-                checked={selectedResolution === 1080}
-                onChange={() => setSelectedResolution(1080)}
-                disabled={!canSelect1080}
-              />
-              1080p
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="resolution"
-                value="1440"
-                checked={selectedResolution === 1440}
-                onChange={() => setSelectedResolution(1440)}
-                disabled={!canSelect1440}
-              />
-              1440p
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="resolution"
-                value="2160"
-                checked={selectedResolution === 2160}
-                onChange={() => setSelectedResolution(2160)}
-                disabled={!canSelect2160}
-              />
-              4K
-            </label>
+            {!isPro ? (
+              <>
+                <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect1080 ? 'text-muted-foreground opacity-60' : ''}`}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="1080"
+                    checked={selectedResolution === 1080}
+                    onChange={() => setSelectedResolution(1080)}
+                    disabled={!canSelect1080}
+                  />
+                  1080p
+                </label>
+                <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect1440 ? 'text-muted-foreground opacity-60' : ''}`}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="1440"
+                    checked={selectedResolution === 1440}
+                    onChange={() => setSelectedResolution(1440)}
+                    disabled={!canSelect1440}
+                  />
+                  1440p
+                </label>
+                <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect2160 ? 'text-muted-foreground opacity-60' : ''}`}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="2160"
+                    checked={selectedResolution === 2160}
+                    onChange={() => setSelectedResolution(2160)}
+                    disabled={!canSelect2160}
+                  />
+                  4K
+                </label>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 sm:gap-4 rounded-md border border-border bg-muted/40 pl-1 py-0 text-sm sm:text-base sm:pl-2">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
+                    <input type="radio" name="resolution" value="1080" disabled />
+                    1080p
+                  </label>
+                  <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
+                    <input type="radio" name="resolution" value="1440" disabled />
+                    1440p
+                  </label>
+                  <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
+                    <input type="radio" name="resolution" value="2160" disabled />
+                    4K
+                  </label>
+                </div>
+                <Button size="xs" onClick={openPayDialog}>Upgrade</Button>
+              </div>
+            )}
           </div>
           {resolutionLimitMsg && (
             <p className="text-sm text-muted-foreground">

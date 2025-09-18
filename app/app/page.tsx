@@ -218,6 +218,7 @@ const Page = () => {
                                     setIsUploading={setVideoIsUploading}
                                     textSets={videoTextSets}
                                     setTextSets={setVideoTextSets}
+                                    openPayDialog={() => setIsPayDialogOpen(true)}
                                 />
                             )}
                             {activeView === 'assets' && (
