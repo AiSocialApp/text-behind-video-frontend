@@ -59,9 +59,11 @@ const Page = () => {
             full_name: `${profile.given_name} ${profile.family_name}`.trim(),
             avatar_url: '',
             images_generated: 0,
-            paid: profile.entitlement !== 'starter',
+            paid: profile.entitlement !== 'free',
+            entitlement: profile.entitlement,
             subscription_id: '',
         });
+        console.log(currentUser)
     };
 
     useEffect(() => {
@@ -69,7 +71,8 @@ const Page = () => {
         getCurrentUser();
       }
     }, [isAuthenticated, profile])
-    
+    console.log(currentUser)
+
     return (
         <>
             {/* Ads script removed */}

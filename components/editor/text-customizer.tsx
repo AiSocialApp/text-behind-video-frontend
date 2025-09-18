@@ -71,7 +71,7 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
             <AccordionContent>
                 {/* Mobile Controls */}
                 <div className="md:hidden">
-                    <ScrollArea className="w-full">
+                    <ScrollArea className="w-full overflow-x-auto">
                         <div className="flex w-max gap-1 mb-2 p-1">
                             {controls.map((control) => (
                                 <button

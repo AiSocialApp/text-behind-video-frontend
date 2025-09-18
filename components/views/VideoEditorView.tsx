@@ -59,6 +59,9 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 }) => {
   const { tokens, profile } = useAuth();
 
+  // Add local state for resolution
+  const [selectedResolution, setSelectedResolution] = useState<number>(720);
+
   const outerRef = useRef<HTMLDivElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,6 +78,27 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     const hasRemaining = (remainingVideos ?? 0) > 0;
     return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating);
   }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating]);
+
+  const canSelect1080 = useMemo(() => {
+    const minDim = Math.min(naturalSize.width, naturalSize.height);
+    return minDim >= 1080; // allow 1080 if short side >= 1080
+  }, [naturalSize]);
+
+  const canSelect2160 = useMemo(() => {
+    const minDim = Math.min(naturalSize.width, naturalSize.height);
+    return minDim >= 2160; // allow 4K if short side >= 2160
+  }, [naturalSize]);
+
+  const resolutionLimitMsg = useMemo(() => {
+    const minDim = Math.min(naturalSize.width, naturalSize.height);
+    if (minDim === 0) return null;
+    if (minDim < 1080) {
+      return `Input video quality limits output to 720p.`;
+    } else if (minDim < 2160) {
+      return `Input video quality limits output to max 1080p.`;
+    }
+    return null;
+  }, [naturalSize]);
 
   const addNewTextSet = () => {
     const newId = Math.max(0, ...textSets.map((s: any) => s.id)) + 1;
@@ -181,8 +205,14 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     img.src = removedFgUrl;
   }, [removedFgUrl, posterUrl, displayedSize.width, displayedSize.height, naturalSize.width]);
 
-  const drawTextSets = (ctx: CanvasRenderingContext2D, targetWidth: number, targetHeight: number, scaleForFont: number) => {
-    Promise.all(
+  const drawTextSets = (
+    ctx: CanvasRenderingContext2D,
+    targetWidth: number,
+    targetHeight: number,
+    scaleForFont: number
+  ) => {
+    // Return the Promise so callers can await font loading
+    return Promise.all(
       textSets.map((textSet) => {
         const fontSizePx = textSet.fontSize * scaleForFont;
         const fontStr = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
@@ -280,10 +310,10 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         });
         ctx.restore();
       });
-    })
+    });
   };
 
-  const drawOverlayCanvas = () => {
+  const drawOverlayCanvas = async () => {
     if (!overlayCanvasRef.current) return null;
     const canvas = overlayCanvasRef.current;
     const width = naturalSize.width || 0;
@@ -295,7 +325,10 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!ctx) return null;
     ctx.clearRect(0, 0, width, height);
     const scaleForFont = 1;
-    drawTextSets(ctx, width, height, scaleForFont);
+
+    // Wait for text drawing to complete
+    await drawTextSets(ctx, width, height, scaleForFont);
+
     return canvas;
   };
 
@@ -451,11 +484,15 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         idToken: tokens.idToken || ''
       };
       const ext = (selectedVideo.name.split('.')?.pop() || 'mp4');
-      const start = await AppApi.startAsset(safeTokens, { extension: ext, length: videoDurationSec });
+      const start = await AppApi.startAsset(safeTokens, {
+        extension: ext,
+        length: videoDurationSec,
+        resolution: selectedResolution,
+      });
       t.dismiss();
       setIsGenerating(false);
 
-      const overlayCanvas = drawOverlayCanvas();
+      const overlayCanvas = await drawOverlayCanvas();
       if (!overlayCanvas) {
         throw new Error('Overlay canvas is not ready');
       }
@@ -487,29 +524,75 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   return (
     <>
       <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileChange} accept="video/*,.mp4,.mov,.webm" />
-      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-10rem)] md:h-[calc(100vh-5rem)] px-10 mt-2'>
-        <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
+      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-8rem)] px-2 md:px-10 mt-2'>
+        <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-2">
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
           <div ref={outerRef} className='flex items-center gap-2 w-full'>
             <Button onClick={pickVideo} variant='secondary'>Upload video</Button>
             <Button onClick={onGenerate} disabled={!canGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
           </div>
+          {/* Add resolution selection radio buttons here */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="resolution"
+                value="720"
+                checked={selectedResolution === 720}
+                onChange={() => setSelectedResolution(720)}
+              />
+              720p
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="resolution"
+                value="1080"
+                checked={selectedResolution === 1080}
+                onChange={() => setSelectedResolution(1080)}
+                disabled={!canSelect1080}
+              />
+              1080p
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="resolution"
+                value="2160"
+                checked={selectedResolution === 2160}
+                onChange={() => setSelectedResolution(2160)}
+                disabled={!canSelect2160}
+              />
+              4K
+            </label>
+          </div>
+          {resolutionLimitMsg && (
+            <p className="text-sm text-muted-foreground">
+              {resolutionLimitMsg}
+            </p>
+          )}
+          {/* resolution selection ends */}
           <div className='block md:hidden'>
-              {(remainingVideos === null) ? (
-                <p className='text-sm'>Unlimited video seconds</p>
-              ) : (
-                <div className='flex items-center gap-5'>
-                  <p className='text-sm'>
-                    {remainingVideos} video seconds left
-                  </p>
-                </div>
-              )}
-            </div>
+            {(remainingVideos === null) ? (
+              <p className='text-sm'>Unlimited video seconds</p>
+            ) : (
+              <div className='flex items-center gap-5'>
+                <p className='text-sm'>
+                  {remainingVideos} video seconds left
+                </p>
+              </div>
+            )}
+          </div>
           <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!isReady || !posterUrl ? (
               <span className='flex items-center w-full gap-2 p-2'>{selectedVideo ? 'Preparing preview…' : 'Upload a video to get started'}</span>
             ) : (
-              <canvas ref={previewCanvasRef} width={displayedSize.width} height={displayedSize.height} style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }} />
+              <canvas
+                ref={previewCanvasRef}
+                width={displayedSize.width}
+                height={displayedSize.height}
+                style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}
+              />
             )}
           </div>
           {profile && profile.entitlement === 'starter' && (
@@ -519,9 +602,17 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         <div className='flex flex-col w-full md:w-1/2 h-full min-h-0'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
           <ScrollArea className="h-full p-2">
-            <Accordion type="single" collapsible className="w-full mt-2">
+            <Accordion type="single" collapsible className="w-full mt-2 max-w-[80vw] mx-auto">
               {textSets.map(textSet => (
-                <TextCustomizer key={textSet.id} textSet={textSet} handleAttributeChange={handleAttributeChange} removeTextSet={removeTextSet} duplicateTextSet={duplicateTextSet} userId={userId} isPaid={isPaid} />
+                <TextCustomizer
+                  key={textSet.id}
+                  textSet={textSet}
+                  handleAttributeChange={handleAttributeChange}
+                  removeTextSet={removeTextSet}
+                  duplicateTextSet={duplicateTextSet}
+                  userId={userId}
+                  isPaid={isPaid}
+                />
               ))}
             </Accordion>
           </ScrollArea>

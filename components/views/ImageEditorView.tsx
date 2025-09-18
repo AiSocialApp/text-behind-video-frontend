@@ -8,6 +8,7 @@ import { removeBackground } from '@imgly/background-removal';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import TextCustomizer from '@/components/editor/text-customizer';
+import { AppApi } from '@/lib/api';
 
 interface ImageEditorViewProps {
   selectedImage: string | null;
@@ -175,8 +176,14 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     img.src = removedBgImageUrl;
   }, [removedBgImageUrl]);
 
-  const drawTextSets = (ctx: CanvasRenderingContext2D, targetWidth: number, targetHeight: number, scaleForFont: number) => {
-    Promise.all(
+  const drawTextSets = (
+    ctx: CanvasRenderingContext2D,
+    targetWidth: number,
+    targetHeight: number,
+    scaleForFont: number
+  ) => {
+    // Return a Promise so callers can await the fonts load
+    return Promise.all(
       textSets.map((textSet) => {
         const fontSizePx = textSet.fontSize * scaleForFont;
         const fontStr = `${textSet.fontWeight} ${fontSizePx}px ${textSet.fontFamily}`;
@@ -275,10 +282,10 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         });
         ctx.restore();
       });
-    })
+    });
   };
 
-  const drawToCanvas = (canvas: HTMLCanvasElement, targetWidth: number, targetHeight: number) => {
+  const drawToCanvas = async (canvas: HTMLCanvasElement, targetWidth: number, targetHeight: number) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     canvas.width = Math.max(1, Math.floor(targetWidth));
@@ -289,19 +296,21 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     if (bgImageRef.current) {
       ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
     }
+
     // Text
     const scaleForFont = imageNaturalSize.width > 0 ? (canvas.width / imageNaturalSize.width) : 1;
-    drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
+    await drawTextSets(ctx, canvas.width, canvas.height, scaleForFont);
+
     // Foreground (subject)
     if (removedBgImageRef.current) {
       ctx.drawImage(removedBgImageRef.current, 0, 0, canvas.width, canvas.height);
     }
   };
 
-  const drawPreview = () => {
+  const drawPreview = async () => {
     if (!previewCanvasRef.current) return;
     if (!displayedSize.width || !displayedSize.height) return;
-    drawToCanvas(previewCanvasRef.current, displayedSize.width, displayedSize.height);
+    await drawToCanvas(previewCanvasRef.current, displayedSize.width, displayedSize.height);
   };
 
   useEffect(() => {
@@ -309,7 +318,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     drawPreview();
     new Promise(resolve => setTimeout(resolve, 1000)).then(
       drawPreview
-    )
+    );
   }, [isImageSetupDone, displayedSize, JSON.stringify(textSets)]);
 
   const handleSaveClick = async () => {
@@ -320,13 +329,54 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
       const width = imageNaturalSize.width || 0;
       const height = imageNaturalSize.height || 0;
       if (width === 0 || height === 0) return;
-      drawToCanvas(canvas, width, height);
+      await drawToCanvas(canvas, width, height);
       const dataUrl = canvas.toDataURL('image/png');
+
+      // Local download
       const link = document.createElement('a');
       link.download = 'text-behind-image.png';
       link.href = dataUrl;
       link.click();
-      // We could also do server upload if desired.
+
+      // Also upload to S3
+      if (!tokens || !tokens.accessToken || !tokens.refreshToken) {
+        toast({ title: 'Not logged in', description: 'Please log in first.' });
+        return;
+      }
+      const { asset_id, image: { put_url } } = await AppApi.startImageAsset(
+        {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expires: tokens.expires,
+          idToken: tokens.idToken || undefined,
+        },
+        { extension: 'png' }
+      );
+      // convert dataUrl to Blob
+      const dataURLtoBlob = (dUrl: string) => {
+        const arr = dUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)![1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+      };
+      const blob = dataURLtoBlob(dataUrl);
+      const uploadRes = await fetch(put_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'image/png',
+        },
+        body: blob,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Image upload failed');
+      }
+
+      toast({ title: 'Image saved', description: 'Successfully uploaded image to your assets.' });
     } catch (err) {
       console.error(err);
       toast({ title: 'Error saving image', description: 'Could not save image.' });
@@ -379,7 +429,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         onChange={handleFileChange}
         accept=".jpg, .jpeg, .png"
       />
-      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-10rem)] md:h-[calc(100vh-5rem)] px-10 mt-2'>
+      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-11rem)] md:h-[calc(100vh-6rem)] px-2 md:px-10 mt-2'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div ref={outerRef} className='flex items-center gap-2 w-full'>

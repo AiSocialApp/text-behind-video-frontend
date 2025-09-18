@@ -214,7 +214,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Choose your plan</DialogTitle>
           <DialogDescription>
@@ -234,7 +234,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
           />
           <Label htmlFor="payment-schedule" className={`relative ms-3 ${isAnnual ? "font-bold" : ""}`}>
             Annual
-            <span className="absolute -top-10 start-auto -end-28">
+            <span className="absolute -top-10 start-auto -end-24">
               <span className="flex items-center">
                 <svg
                   className="w-14 h-8 -me-5"
@@ -257,7 +257,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
         </div>
 
         {/* Grid Cards */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card className="flex flex-col justify-between">
             <div>
               <CardHeader className="text-center pb-2">
@@ -275,11 +275,19 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">30 seconds of video generation / account</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
                     <span className="text-muted-foreground">Basic text editing features</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
                     <span className="text-muted-foreground">Access to 6 free fonts</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">Limited to 720p</span>
                   </li>
                 </ul>
               </CardContent>
@@ -287,11 +295,11 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
             <CardFooter>
               <Button 
                 className="w-full" 
-                variant={userDetails.paid ? "destructive" : "outline"}
-                disabled={!userDetails.paid}
-                onClick={() => userDetails.paid && setIsConfirmDialogOpen(true)}
+                variant={userDetails.entitlement !== 'free' ? "destructive" : "outline"}
+                disabled={userDetails.entitlement === 'free'}
+                onClick={() => userDetails.entitlement !== 'free' && setIsConfirmDialogOpen(true)}
               >
-                {userDetails.paid ? 'Downgrade' : 'Current Plan'}
+                {userDetails.entitlement !== 'free' ? 'Downgrade' : 'Current Plan'}
               </Button>
             </CardFooter>
           </Card>
@@ -299,10 +307,60 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
           <Card className="border-primary flex flex-col justify-between">
             <div>
               <CardHeader className="text-center pb-2">
+                <CardTitle className="mb-2">Starter</CardTitle>
+                <div className="flex items-center justify-center mb-2">
+                  <span className="font-bold text-6xl">
+                    ${isAnnual ? '8' : '10'}
+                  </span>
+                  <span className="text-muted-foreground ml-2">/month</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ul className="mt-7 space-y-2.5 text-sm">
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">Everything in Free</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">100 minutes of video generation / 30 days</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">Unlimited image generations</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">Access to all fonts and text controls</span>
+                  </li>
+                  <li className="flex space-x-2">
+                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
+                    <span className="text-muted-foreground">Limited to 720p</span>
+                  </li>
+                </ul>
+              </CardContent>
+
+              
+            </div>
+            <CardFooter>
+              <Button 
+                className="w-full" 
+                onClick={handleDirectToPaymentLink}
+                disabled={userDetails.entitlement === 'starter' || loading}
+              >
+                {loading ? 'Please wait...' : userDetails.entitlement === 'starter' ? 'Current Plan' : 'Upgrade to Starter'}
+              </Button>
+            </CardFooter>
+          </Card>
+
+
+          <Card className="border-primary flex flex-col justify-between">
+            <div>
+              <CardHeader className="text-center pb-2">
                 <CardTitle className="mb-2">Pro</CardTitle>
                 <div className="flex items-center justify-center mb-2">
                   <span className="font-bold text-6xl">
-                    ${isAnnual ? '7' : '9'}
+                    ${isAnnual ? '12' : '15'}
                   </span>
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
@@ -316,38 +374,28 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                 <ul className="mt-7 space-y-2.5 text-sm">
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Everything in Free</span>
+                    <span className="text-muted-foreground">Everything in Starter</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Unlimited generations / account</span>
+                    <span className="text-muted-foreground">1000 minutes of video generation / 30 days</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Access to all 250 fonts</span>
-                  </li>
-                  <li className="flex space-x-2">
-                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Letter spacing control</span>
-                  </li>
-                  <li className="flex space-x-2">
-                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">3D tilt effects</span>
-                  </li>
-                  <li className="flex space-x-2">
-                    <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">No ads</span>
+                    <span className="text-muted-foreground">Output in 1080p & 4K</span>
                   </li>
                 </ul>
               </CardContent>
+
+              
             </div>
             <CardFooter>
               <Button 
                 className="w-full" 
                 onClick={handleDirectToPaymentLink}
-                disabled={userDetails.paid || loading}
+                disabled={userDetails.entitlement == 'pro' || loading}
               >
-                {loading ? 'Please wait...' : userDetails.paid ? 'Current Plan' : 'Upgrade to Pro'}
+                {loading ? 'Please wait...' : userDetails.entitlement == 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
               </Button>
             </CardFooter>
           </Card>

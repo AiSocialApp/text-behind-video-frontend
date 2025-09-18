@@ -233,7 +233,7 @@ export const AppApi = {
 
   async startAsset(
     tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
-    payload: { extension: string; length: number }
+    payload: { extension: string; length: number; resolution?: number }
   ): Promise<{
     asset_id: string;
     overlay: { bucket: string; key: string; put_url: string };
@@ -245,6 +245,7 @@ export const AppApi = {
       body: JSON.stringify({
         extension: payload.extension.replace(/^\./, ''),
         length: Math.max(0, Math.floor(payload.length)),
+        resolution: payload.resolution ?? 720,
       }),
     });
   },
