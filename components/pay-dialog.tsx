@@ -382,7 +382,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Output in 1080p & 4K</span>
+                    <span className="text-muted-foreground">Output in 1080p, 1440p & 4K</span>
                   </li>
                 </ul>
               </CardContent>

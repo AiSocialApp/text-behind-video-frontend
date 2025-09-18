@@ -79,17 +79,24 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating);
   }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating]);
 
-  const [canSelect1080, canSelect2160] = useMemo(() => {
+  const [canSelect1080, canSelect1440, canSelect2160] = useMemo(() => {
+
     const minDim = Math.min(naturalSize.width, naturalSize.height);
-    const canSelect1080 = minDim >= 1080; // allow 1080 if short side >= 1080
+    if (!selectedVideo || selectedVideo && minDim === 0 ) {
+      return [true, true, true]
+    }
+    const canSelect1080 = minDim >= 1080;
+    const canSelect1440 = minDim >= 1440;
     const canSelect2160 = minDim >= 2160;
     if (!canSelect1080) {
-      setSelectedResolution(720)
-    } else if (!canSelect2160 && selectedResolution > 1080) {
-      setSelectedResolution(1080)
+      setSelectedResolution(720);
+    } else if (!canSelect1440 && selectedResolution > 1080) {
+      setSelectedResolution(1080);
+    } else if (!canSelect2160 && selectedResolution > 1440) {
+      setSelectedResolution(1440);
     }
-    return [canSelect1080, canSelect2160]
-  }, [naturalSize]);
+    return [canSelect1080, canSelect1440, canSelect2160];
+  }, [naturalSize, selectedResolution, selectedVideo]);
 
 
   const resolutionLimitMsg = useMemo(() => {
@@ -97,8 +104,10 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (minDim === 0) return null;
     if (minDim < 1080) {
       return `Input video quality limits output to 720p.`;
-    } else if (minDim < 2160) {
+    } else if (minDim < 1440) {
       return `Input video quality limits output to max 1080p.`;
+    } else if (minDim < 2160) {
+      return `Input video quality limits output to max 1440p.`;
     }
     return null;
   }, [naturalSize]);
@@ -570,6 +579,17 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                 disabled={!canSelect1080}
               />
               1080p
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="resolution"
+                value="1440"
+                checked={selectedResolution === 1440}
+                onChange={() => setSelectedResolution(1440)}
+                disabled={!canSelect1440}
+              />
+              1440p
             </label>
             <label className="flex items-center gap-1">
               <input
