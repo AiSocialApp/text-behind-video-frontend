@@ -323,7 +323,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">100 minutes of video generation / 30 days</span>
+                    <span className="text-muted-foreground">600 seconds of video generation / 30 days</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
@@ -378,7 +378,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">1000 minutes of video generation / 30 days</span>
+                    <span className="text-muted-foreground">3000 seconds of video generation / 30 days</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
