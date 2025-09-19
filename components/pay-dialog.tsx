@@ -198,7 +198,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
     }
   };
 
-  const handleCancelSubscription = async () => {
+  const handleOpenBillingPortal = async () => {
     setLoading(true);
     try {
       const safeTokens = {
@@ -359,8 +359,12 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
             </div>
             <CardFooter>
               {userDetails.entitlement === 'starter' ? (
-                <Button className="w-full" onClick={handleCancelSubscription} disabled={loading}>
+                <Button className="w-full" onClick={handleOpenBillingPortal} disabled={loading}>
                   {loading ? 'Please wait...' : 'Manage billing'}
+                </Button>
+              ) : userDetails.entitlement === 'pro' ? (
+                <Button className="w-full" onClick={handleOpenBillingPortal} disabled={loading}>
+                  {loading ? 'Please wait...' : 'Switch to Starter'}
                 </Button>
               ) : (
                 <Button 
@@ -415,7 +419,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
             </div>
             <CardFooter>
               {userDetails.entitlement === 'pro' ? (
-                <Button className="w-full" onClick={handleCancelSubscription} disabled={loading}>
+                <Button className="w-full" onClick={handleOpenBillingPortal} disabled={loading}>
                   {loading ? 'Please wait...' : 'Manage billing'}
                 </Button>
               ) : (
@@ -447,7 +451,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                 Keep subscription
               </Button>
               <Button 
-                onClick={handleCancelSubscription} 
+                onClick={handleOpenBillingPortal} 
                 disabled={loading} 
                 variant="destructive"
               >
