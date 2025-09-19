@@ -473,9 +473,6 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
               />
             )}
           </div>
-          {(!isPaid) && (
-            <AdsPlaceholder />
-          )}
         </div>
         <div className='flex flex-col w-full md:w-1/2 h-full min-h-0'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
