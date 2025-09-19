@@ -80,7 +80,7 @@ const Page = () => {
                 <div className='flex flex-col h-screen'>
                     <TufaAdBanner variant="narrow" />
                     {!currentUser.paid && null}
-                    <header className='flex flex-row items-center justify-between p-5 px-10'>
+                    <header className='flex flex-row items-center justify-between p-5 md:px-10'>
                          <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>
   <Menu className='h-5 w-5' />
 </Button>
