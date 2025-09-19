@@ -1,14 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: 'export',
+    trailingSlash: true,
     images: {
-        remotePatterns: [
-            {
-              protocol: 'https',
-              hostname: 'images.unsplash.com',
-            },
-            // Removed supabase host; add any image hosts you need here
-          ],
+        unoptimized: true
     },
 
     async headers() {

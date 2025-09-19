@@ -616,15 +616,15 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       setIsUploading(true);
       await uploadOverlay((start as any).overlay.put_url, overlayCanvas);
 
-      toast({ title: 'Uploading video', description: 'Uploading video in parts...' });
+      toast({ title: 'Uploading video', description: 'Uploading orignal in parts' });
       await uploadVideoMultipart(selectedVideo, (start as any).asset_id, (start as any).video.key, (start as any).video.s3_upload_id, MIN_PART_SIZE_MB);
       setIsUploading(false);
 
-      toast({ title: 'Processing', description: 'Compositing your video. This may take a while.' });
+      toast({ title: 'Processing', description: 'Compositing your video. This can take up to 15 minutes. Your video will be in your library when complete.' });
       const finalAsset = await pollAsset((start as any).asset_id);
 
       if (finalAsset?.status === 'COMPLETE') {
-        toast({ title: 'Done', description: 'Your video is ready in Assets.' });
+        toast({ title: 'Done', description: 'Your video is ready in your library.' });
       } else if (finalAsset?.status === 'FAILED') {
         toast({ title: 'Failed', description: 'Video processing failed.' });
       }
@@ -640,7 +640,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   return (
     <>
       <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileChange} accept="video/*,.mp4,.mov,.webm" />
-      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-9rem)] px-2 md:px-10 mt-2'>
+      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-10rem)] px-2 md:px-10 mt-2'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-2">
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
           <div className='flex items-center gap-2 w-full'>

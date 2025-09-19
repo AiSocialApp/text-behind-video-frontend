@@ -107,11 +107,10 @@ export async function _authFetch<T>(url: string, token: string, init?: RequestIn
   return apiFetch<T>(url, { ...(init || {}), headers });
 }
 
-function nearExpiry(expires: number | null): boolean {
-  if (!expires) return false;
+function isExpired(expires: number | null): boolean {
+  if (expires === null) return true;
   const now = Math.floor(Date.now() / 1000);
-  // refresh if token is within 60 seconds of expiring
-  return expires < (now + 60);
+  return expires <= now;
 }
 
 export type AuthTokens = {
@@ -143,27 +142,45 @@ export function setOnRemainingUpdated(handler?: (remaining: { video: number | nu
   onRemainingUpdated = handler || null;
 }
 
+async function refreshIfExpired(tokens: AuthTokens): Promise<boolean> {
+  if (!isExpired(tokens.expires)) return false;
+  const newTokens = await AuthApi.refreshToken(tokens.idToken || '', tokens.accessToken, tokens.refreshToken);
+
+  tokens.idToken = newTokens.id_token;
+  tokens.accessToken = newTokens.access_token;
+  tokens.refreshToken = newTokens.refresh_token;
+
+  if (newTokens.refreshed) {
+    tokens.expires = newTokens.expires;
+  }
+
+  if (onTokensRefreshed) {
+    onTokensRefreshed({
+      idToken: newTokens.id_token,
+      accessToken: newTokens.access_token,
+      refreshToken: newTokens.refresh_token,
+      expires: newTokens.refreshed ? newTokens.expires : tokens.expires,
+    });
+  }
+
+  return newTokens.refreshed;
+}
+
 export async function authFetch<T>(
   url: string,
   tokens: AuthTokens,
   init?: RequestInit
 ): Promise<T> {
-  if (nearExpiry(tokens.expires)) {
-    const newTokens = await AuthApi.refreshToken(tokens.idToken || '', tokens.accessToken, tokens.refreshToken);
-    tokens.idToken = newTokens.id_token;
-    tokens.accessToken = newTokens.access_token;
-    tokens.refreshToken = newTokens.refresh_token;
-    tokens.expires = newTokens.expires;
-    if (onTokensRefreshed) {
-      onTokensRefreshed({
-        idToken: newTokens.id_token,
-        accessToken: newTokens.access_token,
-        refreshToken: newTokens.refresh_token,
-        expires: newTokens.expires,
-      });
+  await refreshIfExpired(tokens);
+  try {
+    return await _authFetch<T>(url, tokens.accessToken, init);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      await refreshIfExpired(tokens);
+      return _authFetch<T>(url, tokens.accessToken, init);
     }
+    throw err;
   }
-  return _authFetch<T>(url, tokens.accessToken, init);
 }
 
 export const AuthApi = {
