@@ -56,7 +56,6 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
         { id: 'rotation', icon: <RotateCw size={20} />, label: 'Rotate' },
         { id: 'tiltX', icon: <ArrowLeftRight size={20} />, label: 'Tilt X (3D effect)', premium: true },
         { id: 'tiltY', icon: <ArrowUpDown size={20} />, label: 'Tilt Y (3D effect)', premium: true },
-        { id: 'boxWidth', icon: <AlignHorizontalSpaceAround size={20} />, label: 'Text box width' },
     ];  
 
     const handlePremiumAttributeChange = (attribute: string, value: any) => {
@@ -81,7 +80,6 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                                         activeControl === control.id ? 'bg-primary text-primary-foreground' : 'bg-secondary'
                                     } ${control.premium && !isPaidUser ? 'opacity-70' : ''}`}
                                 >
-                                    {control.premium && !isPaidUser && <LockIcon size={12} className="absolute top-1 right-1" />}
                                     {control.icon}
                                     <span className="text-xs mt-1">{control.label}</span>
                                 </button>
@@ -196,6 +194,8 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                                     step={0.05}
                                     currentValue={textSet.lineHeight ?? 1.2}
                                     handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
+                                    disabled={!isPaidUser}
+                                    premiumFeature={!isPaidUser}
                                 />
                             </div>
                         )}
@@ -342,6 +342,8 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                         step={0.05}
                         currentValue={textSet.lineHeight ?? 1.2}
                         handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
+                        disabled={!isPaidUser}
+                        premiumFeature={!isPaidUser}
                     />
                     <SliderField
                         attribute="opacity"
@@ -386,8 +388,8 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                 </div>
 
                 <div className="flex flex-row gap-2 my-8">
-                    <Button onClick={() => duplicateTextSet(textSet)}>Duplicate Text Set</Button>
-                    <Button variant="destructive" onClick={() => removeTextSet(textSet.id)}>Remove Text Set</Button>
+                    <Button onClick={() => duplicateTextSet(textSet)}><span className='text-xs sm:text-sm'>Duplicate Text Set</span></Button>
+                    <Button variant="destructive" onClick={() => removeTextSet(textSet.id)}><span className='text-xs sm:text-sm'>Remove Text Set</span></Button>
                 </div>
             </AccordionContent>
         </AccordionItem>

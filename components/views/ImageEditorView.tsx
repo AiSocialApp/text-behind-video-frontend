@@ -53,7 +53,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
 
   // We'll replicate logic for user entitlements:
   const remainingImages = useMemo(() => profile?.remaining?.image ?? null, [profile]);
-  const isPaid = useMemo(() => (profile ? profile.entitlement !== 'starter' : false), [profile]);
+  const isPaid = useMemo(() => (profile ? profile.entitlement !== 'free' : false), [profile]);
   const currentUser = useMemo(() => {
     if (!profile) return null;
     return {

@@ -84,7 +84,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const currentFileRef = useRef<File | null>(null);
 
   const remainingVideos = useMemo(() => profile?.remaining?.video ?? null, [profile]);
-  const isPaid = useMemo(() => (profile ? profile.entitlement !== 'starter' : false), [profile]);
+  const isPaid = useMemo(() => (profile ? profile.entitlement !== 'free' : false), [profile]);
   const isPro = useMemo(() => profile?.entitlement === 'pro', [profile]);
   const userId = profile?.username ?? '';
 
@@ -160,7 +160,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!outerRef.current || naturalSize.width === 0 || naturalSize.height === 0) return;
     const rect = outerRef.current.getBoundingClientRect();
     const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 220));
-    const scale = Math.min(rect.width / naturalSize.width, maxPreviewHeight / naturalSize.height);
+    const scale = Math.min((rect.width - 16) / naturalSize.width, maxPreviewHeight / naturalSize.height);
     const targetWidth = Math.max(1, Math.floor(naturalSize.width * scale));
     const targetHeight = Math.max(1, Math.floor(naturalSize.height * scale));
     debugLog('updatePreviewScale', { rectWidth: rect.width, rectHeight: rect.height, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
@@ -616,7 +616,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       setIsUploading(true);
       await uploadOverlay((start as any).overlay.put_url, overlayCanvas);
 
-      toast({ title: 'Uploading video', description: 'Uploading orignal in parts' });
+      toast({ title: 'Uploading video', description: 'Uploading original video...' });
       await uploadVideoMultipart(selectedVideo, (start as any).asset_id, (start as any).video.key, (start as any).video.s3_upload_id, MIN_PART_SIZE_MB);
       setIsUploading(false);
 
@@ -778,8 +778,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         </div>
         <div className='flex flex-col w-full md:w-1/2 h-full min-h-0'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
-          <ScrollArea className="h-full p-2">
-            <Accordion type="single" collapsible className="w-full mt-2 max-w-[80vw] mx-auto">
+          <ScrollArea className="h-full py-2">
+            <Accordion type="single" collapsible className="w-full mt-2 max-w-[95vw] mx-auto">
               {textSets.map(textSet => (
                 <TextCustomizer
                   key={textSet.id}
