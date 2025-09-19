@@ -4,17 +4,16 @@ import React from 'react';
 import { motion } from "framer-motion";
 import { HeroHighlight, Highlight } from '@/components/ui/hero-highlight';
 
-import AdsPlaceholder from '@/components/ads-placeholder';
 import HeroVideoGallery from '@/components/HeroVideoGallery';
 import Link from 'next/link';
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient';
 import { Badge } from '@/components/ui/badge';
+import TufaAdBanner from '@/components/TufaAdBanner';
 
 const page = () => {
     return ( 
         <div className='flex flex-col min-h-screen items-center w-full'>
             {/* <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1609710199882100" crossOrigin="anonymous"></script> */}
-            <AdsPlaceholder position="top" />
             <HeroHighlight>
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }} 
@@ -61,6 +60,10 @@ const page = () => {
             
             <div className='w-full h-full mt-2'>
                 <HeroVideoGallery />
+            </div>
+            {/* Footer Ad - large, non-closable, always purple */}
+            <div className='w-full mt-8'>
+                <TufaAdBanner variant="large" />
             </div>
         </div>
     );

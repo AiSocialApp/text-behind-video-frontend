@@ -640,7 +640,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   return (
     <>
       <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileChange} accept="video/*,.mp4,.mov,.webm" />
-      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-8rem)] px-2 md:px-10 mt-2'>
+      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-9rem)] px-2 md:px-10 mt-2'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-2">
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
           <div className='flex items-center gap-2 w-full'>

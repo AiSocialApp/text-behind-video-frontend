@@ -22,6 +22,7 @@ import { Menu } from 'lucide-react'
 
 import '@/app/fonts.css';
 import PayDialog from '@/components/pay-dialog';
+import TufaAdBanner from '@/components/TufaAdBanner';
 
 const Page = () => {
     const { isAuthenticated, tokens, profile, logout, isLoading } = useAuth();
@@ -75,9 +76,9 @@ const Page = () => {
 
     return (
         <>
-            {/* Ads script removed */}
             {!isLoading && isAuthenticated && currentUser ? (
                 <div className='flex flex-col h-screen'>
+                    <TufaAdBanner variant="narrow" />
                     {!currentUser.paid && null}
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
                          <Button className='md:hidden' variant='secondary' onClick={() => setIsMobileSidebarOpen(true)}>
