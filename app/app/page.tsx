@@ -29,6 +29,7 @@ const Page = () => {
     const [currentUser, setCurrentUser] = useState<Profile>()
     const [isPayDialogOpen, setIsPayDialogOpen] = useState<boolean>(false); 
     const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
+    const [isModelWarningVisible, setIsModelWarningVisible] = useState<boolean>(true);
 
     const [activeView, setActiveView] = useState<'image' | 'video' | 'assets'>('video');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -220,6 +221,8 @@ const Page = () => {
                                     textSets={videoTextSets}
                                     setTextSets={setVideoTextSets}
                                     openPayDialog={() => setIsPayDialogOpen(true)}
+                                    modelWarningVisible={isModelWarningVisible}
+                                    dismissModelWarning={() => setIsModelWarningVisible(false)}
                                 />
                             )}
                             {activeView === 'assets' && (

@@ -43,6 +43,8 @@ interface VideoEditorViewProps {
   textSets: any[];
   setTextSets: React.Dispatch<React.SetStateAction<any[]>>;
   openPayDialog: () => void;
+  modelWarningVisible: boolean;
+  dismissModelWarning: () => void;
 }
 
 const VideoEditorView: React.FC<VideoEditorViewProps> = ({
@@ -67,6 +69,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   textSets,
   setTextSets,
   openPayDialog,
+  modelWarningVisible,
+  dismissModelWarning,
 }) => {
   const { tokens, profile, updateRemaining } = useAuth();
 
@@ -643,6 +647,12 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full md:h-[calc(100vh-10rem)] px-2 md:px-10 mt-2'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-2">
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
+          {modelWarningVisible && (
+            <div className="w-full rounded-md bg-yellow-100 text-yellow-900 border border-yellow-300 p-2 text-xs flex items-start justify-between">
+              <span className="my-auto">Our video model is tuned to select people. Accuracy with other subjects may be degraded.</span>
+              <button onClick={dismissModelWarning} className="pl-1 text-yellow-900 hover:opacity-80 text-sm">✕</button>
+            </div>
+          )}
           <div className='flex items-center gap-2 w-full'>
             <Button onClick={pickVideo} variant='secondary'>Upload video</Button>
             <Button onClick={onGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
