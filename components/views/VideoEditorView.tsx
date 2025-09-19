@@ -68,7 +68,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   setTextSets,
   openPayDialog,
 }) => {
-  const { tokens, profile } = useAuth();
+  const { tokens, profile, updateRemaining } = useAuth();
 
   // Add local state for resolution
   const [selectedResolution, setSelectedResolution] = useState<number>(720);
@@ -91,8 +91,10 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const canGenerate = useMemo(() => {
     const hasUnlimited = remainingVideos === null;
     const hasRemaining = (remainingVideos ?? 0) > 0;
-    return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && !isGenerating);
-  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating]);
+    // Also ensure remaining is sufficient for the full video length when limited
+    const hasEnoughSeconds = hasUnlimited || ((remainingVideos ?? 0) >= Math.max(0, Math.round(videoDurationSec)));
+    return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && hasEnoughSeconds && !isGenerating);
+  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating, videoDurationSec]);
 
   const [canSelect1080, canSelect1440, canSelect2160] = useMemo(() => {
 
@@ -570,6 +572,17 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 
   const onGenerate = async () => {
     if (!tokens.accessToken || !selectedVideo) return;
+    const hasUnlimited = remainingVideos === null;
+    const remaining = remainingVideos ?? 0;
+    const needed = Math.max(0, Math.round(videoDurationSec));
+    if (!hasUnlimited && remaining <= 0) {
+      toast({ title: 'Limit reached', description: 'You have no video seconds remaining.' });
+      return;
+    }
+    if (!hasUnlimited && needed > remaining) {
+      toast({ title: 'Insufficient remaining seconds', description: `${needed} seconds in selected video, but only ${remaining} seconds left.` });
+      return;
+    }
 
     setIsGenerating(true);
     const t = toast({ title: 'Starting...', description: 'Preparing upload session.' });
@@ -588,6 +601,9 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         resolution: selectedResolution,
       });
       debugLog('startAsset response', start);
+      if ((start as any).remaining) {
+        updateRemaining((start as any).remaining);
+      }
       t.dismiss();
       setIsGenerating(false);
 
@@ -629,7 +645,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
           <canvas ref={overlayCanvasRef} style={{ display: 'none' }} />
           <div className='flex items-center gap-2 w-full'>
             <Button onClick={pickVideo} variant='secondary'>Upload video</Button>
-            <Button onClick={onGenerate} disabled={!canGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
+            <Button onClick={onGenerate}>{isGenerating ? 'Generating…' : 'Generate'}</Button>
           </div>
           {/* Add resolution selection radio buttons here */}
           <div className="flex items-center gap-4 text-sm flex-wrap sm:text-base">
@@ -643,7 +659,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               />
               720p
             </label>
-            {!isPro ? (
+            {isPro ? (
               <>
                 <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect1080 ? 'text-muted-foreground opacity-60' : ''}`}>
                   <input

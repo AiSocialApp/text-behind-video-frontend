@@ -39,7 +39,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
   displayedSize,
   setDisplayedSize,
 }) => {
-  const { tokens, profile } = useAuth();
+  const { tokens, profile, updateRemaining } = useAuth();
 
   // We'll replicate relevant states that were in page.tsx.
   const [isSaving, setIsSaving] = useState(false);
@@ -323,6 +323,12 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
 
   const handleSaveClick = async () => {
     if (!canvasRef.current || !isImageSetupDone) return;
+    const hasUnlimited = remainingImages === null;
+    const hasRemaining = (remainingImages ?? 0) > 0;
+    if (!(hasUnlimited || hasRemaining)) {
+      toast({ title: 'Limit reached', description: 'You have no image generations remaining.' });
+      return;
+    }
     setIsSaving(true);
     try {
       const canvas = canvasRef.current;
@@ -343,7 +349,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         toast({ title: 'Not logged in', description: 'Please log in first.' });
         return;
       }
-      const { asset_id, image: { put_url } } = await AppApi.startImageAsset(
+      const { asset_id, image: { put_url }, remaining } = await AppApi.startImageAsset(
         {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
@@ -352,6 +358,9 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         },
         { extension: 'png' }
       );
+      if (remaining) {
+        updateRemaining(remaining);
+      }
       // convert dataUrl to Blob
       const dataURLtoBlob = (dUrl: string) => {
         const arr = dUrl.split(',');
@@ -434,7 +443,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div ref={outerRef} className='flex items-center gap-2 w-full'>
             <Button onClick={handleUploadImage} variant='secondary'>Upload image</Button>
-            <Button onClick={handleSaveClick} disabled={isSaving || !selectedImage || !(remainingImages === null || (remainingImages ?? 0) > 0)}>
+            <Button onClick={handleSaveClick} disabled={isSaving || !selectedImage}>
               {isSaving ? 'Saving…' : 'Save'}
             </Button>
           </div>

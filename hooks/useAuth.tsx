@@ -16,6 +16,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>;
   register: (payload: { email: string; given_name: string; family_name: string; password: string }) => Promise<void>;
   logout: () => void;
+  updateRemaining: (remaining: { video: number | null; image: number | null }) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -132,8 +133,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateRemaining: AuthContextType["updateRemaining"] = (remaining) => {
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return { ...prev, remaining };
+    });
+  };
+
   const value: AuthContextType = useMemo(
-    () => ({ isLoading, isAuthenticated, tokens, profile, login, register, logout }),
+    () => ({ isLoading, isAuthenticated, tokens, profile, login, register, logout, updateRemaining }),
     [isLoading, isAuthenticated, tokens, profile]
   );
 
