@@ -32,7 +32,7 @@ jobs:
           to: s3://text-behind-video.io
       - run:
           name: Invalidate CloudFront cache
-          command: aws cloudfront create-invalidation --distribution-id EBT4WHC4G5PZH --paths '/*'
+          command: aws cloudfront create-invalidation --distribution-id EBT4WHC4G5PZH --paths '/*' --profile OIDC-User
 
 workflows:
   version: 2
