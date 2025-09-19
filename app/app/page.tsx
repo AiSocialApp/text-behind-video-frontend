@@ -141,7 +141,7 @@ const Page = () => {
                                     className="p-0 h-auto text-sm text-primary hover:underline hidden lg:block"
                                     onClick={() => setIsPayDialogOpen(true)}
                                 >
-                                    Upgrade
+                                    {profile?.entitlement === 'free' ? 'Upgrade' : 'Your Plan'}
                                 </Button>
                             </div>
 

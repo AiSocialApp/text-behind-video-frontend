@@ -34,9 +34,10 @@ export default function BillingReturnPage() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">
-      Updating your account...
+      Refreshing your account...
     </div>
   );
 }
+
 
 

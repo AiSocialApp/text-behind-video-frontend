@@ -314,7 +314,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
             </CardFooter>
           </Card>
 
-          <Card className="border-primary flex flex-col justify-between">
+          <Card className={`relative border-primary flex flex-col justify-between ${userDetails.entitlement === 'starter' ? 'border-4' : ''}`}>
             <div>
               <CardHeader className="text-center pb-2">
                 <CardTitle className="mb-2">Starter</CardTitle>
@@ -324,6 +324,11 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </span>
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
+                {userDetails.entitlement === 'starter' && (
+                  <Badge className="w-max self-center">
+                    Current Plan
+                  </Badge> )
+                }
               </CardHeader>
               <CardContent>
                 <ul className="mt-7 space-y-2.5 text-sm">
@@ -370,9 +375,9 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
           </Card>
 
 
-          <Card className="border-primary flex flex-col justify-between">
+          <Card className={`relative border-primary flex flex-col justify-between ${userDetails.entitlement === 'pro' ? 'border-4' : ''}`}>
             <div>
-              <CardHeader className="text-center pb-2">
+              <CardHeader className="text-center pb-2">                
                 <CardTitle className="mb-2">Pro</CardTitle>
                 <div className="flex items-center justify-center mb-2">
                   <span className="font-bold text-6xl">
@@ -380,7 +385,10 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </span>
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
-                {isAnnual && (
+                {userDetails.entitlement === 'pro' ? (
+                  <Badge className="w-max self-center">
+                    Current Plan
+                  </Badge> ) : isAnnual && (
                   <Badge className="uppercase w-max self-center">
                     Most popular
                   </Badge>

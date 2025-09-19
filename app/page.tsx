@@ -6,12 +6,15 @@ import { HeroHighlight, Highlight } from '@/components/ui/hero-highlight';
 
 import AdsPlaceholder from '@/components/ads-placeholder';
 import HeroVideoGallery from '@/components/HeroVideoGallery';
+import Link from 'next/link';
+import { HoverBorderGradient } from '@/components/ui/hover-border-gradient';
+import { Badge } from '@/components/ui/badge';
 
 const page = () => {
     return ( 
         <div className='flex flex-col min-h-screen items-center w-full'>
             {/* <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1609710199882100" crossOrigin="anonymous"></script> */}
-            {/* <AdsPlaceholder position="top" /> */}
+            <AdsPlaceholder position="top" />
             <HeroHighlight>
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }} 
@@ -25,17 +28,24 @@ const page = () => {
                     </Highlight>
                     {" "} designs easily
                 </motion.h1>
+                <div className="max-w-5xl w-full mx-auto flex justify-center md:justify-end mt-5 md:mt-2">
+                    <Link href={'https://tufa.io'} target='_blank'>
+                        <Badge variant="brand" className="gap-1 px-3 py-0.5 text-sm">
+                            <span>a</span>
+                            <img src="/tufa.svg" alt="Tufa" className="h-6 w-25" />
+                            <span>product</span>
+                        </Badge>
+                    </Link>
+                </div>
             </HeroHighlight>
-            
-            <div className="text-lg text-center font-semibold mb-4">
-                Coming soon
-            </div>
-{/* 
             <Link href={'/app'} className='mb-10'>
                 <HoverBorderGradient containerClassName="rounded-full" as="button" className="dark:bg-black bg-white text-black dark:text-white flex items-center space-x-2">
                     Open the app
                 </HoverBorderGradient>
             </Link>
+
+{/* 
+
 
             <div className="flex space-x-4">
                 <a href="https://www.producthunt.com/posts/text-behind-image?embed=true&utm_source=badge-top-post-topic-badge&utm_medium=badge&utm_souce=badge-text&#0045;behind&#0045;image" target="_blank">
