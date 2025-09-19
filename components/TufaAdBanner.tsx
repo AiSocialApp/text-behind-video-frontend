@@ -51,7 +51,6 @@ export default function TufaAdBanner({
     return () => clearInterval(id);
   }, [cycleMs, messages.length]);
 
-  if (variant === "narrow" && closed) return null;
 
   const isNarrow = variant === "narrow";
 
@@ -67,6 +66,8 @@ export default function TufaAdBanner({
     () => messages.reduce((a, b) => (b.length > a.length ? b : a), ""),
     [messages]
   );
+
+  if (variant === "narrow" && closed) return null;
 
   return (
     <div className={containerClasses}>

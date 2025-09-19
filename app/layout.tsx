@@ -14,6 +14,12 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: "Text Behind Video",
   description: "Create text behind video designs",
+  icons: {
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+  },
 };
 
 export default function RootLayout({
