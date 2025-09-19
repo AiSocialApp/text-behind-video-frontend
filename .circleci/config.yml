@@ -26,9 +26,7 @@ jobs:
           role_arn: 'arn:aws:iam::${AWS_ACCOUNT_ID}:role/circleci-oidc-role'
           role_session_name: "fe-deploy-production"
       - aws-s3/sync:
-          arguments: |
-            --acl public-read \
-            --cache-control "max-age=86400"
+          arguments: --acl public-read --cache-control max-age=86400 --delete
           from: out
           profile_name: OIDC-User
           to: s3://text-behind-video.io
