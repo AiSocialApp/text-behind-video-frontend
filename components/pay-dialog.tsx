@@ -47,7 +47,7 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isAnnual, setIsAnnual] = React.useState(false);
     
-    const handleDirectToPaymentLink = async () => {
+    const handleDirectToPaymentLink = async (target: 'starter' | 'pro') => {
       setLoading(true);
       try {
         const safeTokens = {
@@ -56,8 +56,13 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
           expires: tokens.expires,
           idToken: tokens.idToken || ''
         };
-        const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
-        router.push(portal.billing_portal_url);
+        if ((userDetails.entitlement ?? 'free') === 'free') {
+          const session = await AppApi.checkout(safeTokens, { plan: target, period: isAnnual ? 'annual' : 'monthly' });
+          router.push(session.checkout_url);
+        } else {
+          const portal = await AppApi.portal(safeTokens);
+          router.push(portal.billing_portal_url);
+        }
       } catch (error) {
         toast({
           title: "Error",
@@ -78,7 +83,7 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
           expires: tokens.expires,
           idToken: tokens.idToken || ''
         };
-        const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+        const portal = await AppApi.portal(safeTokens);
         router.push(portal.billing_portal_url);
       } catch (error) {
         console.error('Error opening billing portal:', error);
@@ -125,12 +130,12 @@ const PlanCard: React.FC<Plan> = ({ userDetails, userEmail, title, description, 
                             </Button>
                         )
                     ) : title.includes("Pro") ? (
-                        userDetails.paid ? (
+        userDetails.paid ? (
                             <Button disabled={true}>
                                 {loading ? 'Please wait' : 'Current Plan'}
                             </Button>
                         ) : (
-                            <Button onClick={handleDirectToPaymentLink} disabled={loading}>
+            <Button onClick={() => handleDirectToPaymentLink('pro')} disabled={loading}>
                                 {loading ? 'Please wait' : 'Upgrade'}
                             </Button>
                         )
@@ -166,7 +171,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
   const [isAnnual, setIsAnnual] = React.useState(true);
 
-  const handleDirectToPaymentLink = async () => {
+  const handleDirectToPaymentLink = async (target: 'starter' | 'pro') => {
     setLoading(true);
     try {
       const safeTokens = {
@@ -175,8 +180,13 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
         expires: tokens.expires,
         idToken: tokens.idToken || ''
       };
-      const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
-      router.push(portal.billing_portal_url);
+      if ((userDetails.entitlement ?? 'free') === 'free') {
+        const session = await AppApi.checkout(safeTokens, { plan: target, period: isAnnual ? 'annual' : 'monthly' });
+        router.push(session.checkout_url);
+      } else {
+        const portal = await AppApi.portal(safeTokens);
+        router.push(portal.billing_portal_url);
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -197,7 +207,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
         expires: tokens.expires,
         idToken: tokens.idToken || ''
       };
-      const portal = await AppApi.portal(safeTokens, undefined, window.location.href);
+      const portal = await AppApi.portal(safeTokens);
       router.push(portal.billing_portal_url);
     } catch (error) {
       console.error('Error opening billing portal:', error);
@@ -343,13 +353,19 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
               
             </div>
             <CardFooter>
-              <Button 
-                className="w-full" 
-                onClick={handleDirectToPaymentLink}
-                disabled={userDetails.entitlement === 'starter' || loading}
-              >
-                {loading ? 'Please wait...' : userDetails.entitlement === 'starter' ? 'Current Plan' : 'Upgrade to Starter'}
-              </Button>
+              {userDetails.entitlement === 'starter' ? (
+                <Button className="w-full" onClick={handleCancelSubscription} disabled={loading}>
+                  {loading ? 'Please wait...' : 'Manage billing'}
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleDirectToPaymentLink('starter')}
+                  disabled={loading}
+                >
+                  {loading ? 'Please wait...' : 'Upgrade to Starter'}
+                </Button>
+              )}
             </CardFooter>
           </Card>
 
@@ -390,13 +406,19 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
               
             </div>
             <CardFooter>
-              <Button 
-                className="w-full" 
-                onClick={handleDirectToPaymentLink}
-                disabled={userDetails.entitlement == 'pro' || loading}
-              >
-                {loading ? 'Please wait...' : userDetails.entitlement == 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
-              </Button>
+              {userDetails.entitlement === 'pro' ? (
+                <Button className="w-full" onClick={handleCancelSubscription} disabled={loading}>
+                  {loading ? 'Please wait...' : 'Manage billing'}
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleDirectToPaymentLink('pro')}
+                  disabled={loading}
+                >
+                  {loading ? 'Please wait...' : 'Upgrade to Pro'}
+                </Button>
+              )}
             </CardFooter>
           </Card>
         </div>

@@ -17,6 +17,7 @@ type AuthContextType = {
   register: (payload: { email: string; given_name: string; family_name: string; password: string }) => Promise<void>;
   logout: () => void;
   updateRemaining: (remaining: { video: number | null; image: number | null }) => void;
+  refreshProfile: () => Promise<MeResponse | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -140,8 +141,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const refreshProfile: AuthContextType["refreshProfile"] = async () => {
+    if (!tokens.accessToken) return null;
+    try {
+      const me = await AppApi.me({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken || null,
+        expires: tokens.expires,
+        idToken: tokens.idToken || undefined,
+      } as any);
+      setProfile(me);
+      return me;
+    } catch {
+      return null;
+    }
+  };
+
   const value: AuthContextType = useMemo(
-    () => ({ isLoading, isAuthenticated, tokens, profile, login, register, logout, updateRemaining }),
+    () => ({ isLoading, isAuthenticated, tokens, profile, login, register, logout, updateRemaining, refreshProfile }),
     [isLoading, isAuthenticated, tokens, profile]
   );
 

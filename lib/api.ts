@@ -66,6 +66,7 @@ export const endpoints = {
     uploadSign: `${APP_BASE}/uploads/multipart/sign/`,
     uploadComplete: `${APP_BASE}/uploads/multipart/complete/`,
     portal: `${APP_BASE}/portal/`,
+    paymentLink: `${APP_BASE}/payment/link/`,
   },
 };
 
@@ -229,13 +230,18 @@ export const AppApi = {
   },
 
   async portal(
-    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
-    account_id: string | undefined,
-    return_url: string
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string }
   ): Promise<{ billing_portal_url: string }> {
-    const url = new URL(endpoints.app.portal);
-    if (account_id) url.searchParams.set('account_id', account_id);
-    url.searchParams.set('return_url', return_url);
+    return authFetch(endpoints.app.portal, tokens);
+  },
+
+  async checkout(
+    tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
+    params: { plan: 'starter' | 'pro'; period: 'monthly' | 'annual' }
+  ): Promise<{ checkout_url: string }> {
+    const url = new URL(endpoints.app.paymentLink);
+    url.searchParams.set('plan', params.plan);
+    url.searchParams.set('period', params.period);
     return authFetch(url.toString(), tokens);
   },
 
