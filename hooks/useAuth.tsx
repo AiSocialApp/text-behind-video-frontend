@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { AuthApi, AppApi, LoginResponse, MeResponse, setOnTokensRefreshed } from "@/lib/api";
+import { AuthApi, AppApi, LoginResponse, MeResponse, setOnTokensRefreshed, setOnRemainingUpdated } from "@/lib/api";
 
 type AuthContextType = {
   isLoading: boolean;
@@ -67,7 +67,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expires: t.expires,
       });
     });
-    return () => setOnTokensRefreshed(undefined);
+    setOnRemainingUpdated((remaining) => {
+      setProfile((prev) => {
+        const next = { ...(prev || {} as any) } as MeResponse;
+        next.remaining = remaining;
+        return next;
+      });
+    });
+    return () => {
+      setOnTokensRefreshed(undefined);
+      setOnRemainingUpdated(undefined);
+    };
   }, []);
 
   const isAuthenticated = Boolean(tokens.accessToken);

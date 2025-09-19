@@ -127,6 +127,8 @@ let onTokensRefreshed: ((tokens: {
   expires: number | null;
 }) => void) | null = null;
 
+let onRemainingUpdated: ((remaining: { video: number | null; image: number | null }) => void) | null = null;
+
 export function setOnTokensRefreshed(handler?: (tokens: {
   idToken: string;
   accessToken: string;
@@ -134,6 +136,10 @@ export function setOnTokensRefreshed(handler?: (tokens: {
   expires: number | null;
 }) => void) {
   onTokensRefreshed = handler || null;
+}
+
+export function setOnRemainingUpdated(handler?: (remaining: { video: number | null; image: number | null }) => void) {
+  onRemainingUpdated = handler || null;
 }
 
 export async function authFetch<T>(
@@ -239,22 +245,31 @@ export const AppApi = {
   ): Promise<{
     asset_id: string;
     image: { bucket: string; key: string; put_url: string };
+    remaining?: MeResponse['remaining'];
   }> {
-    return authFetch(endpoints.app.assetsImageStart, tokens, {
+    const res = await authFetch<{
+      asset_id: string;
+      image: { bucket: string; key: string; put_url: string };
+      remaining?: MeResponse['remaining'];
+    }>(endpoints.app.assetsImageStart, tokens, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ extension: payload.extension.replace(/^\./, '') }),
     });
+    if (res.remaining && onRemainingUpdated) onRemainingUpdated(res.remaining as NonNullable<MeResponse['remaining']>);
+    return res;
   },
 
   async listAssets(
     tokens: { accessToken: string; refreshToken: string; expires: number | null; idToken?: string },
     params?: { page?: number; limit?: number }
-  ): Promise<{ assets: Record<string, any> }> {
+  ): Promise<{ assets: Record<string, any>; remaining?: MeResponse['remaining'] }> {
     const url = new URL(endpoints.app.assets);
     if (params?.page) url.searchParams.set('page', String(params.page));
     if (params?.limit) url.searchParams.set('limit', String(params.limit));
-    return authFetch(url.toString(), tokens);
+    const res = await authFetch<{ assets: Record<string, any>; remaining?: MeResponse['remaining'] }>(url.toString(), tokens);
+    if (res.remaining && onRemainingUpdated) onRemainingUpdated(res.remaining as NonNullable<MeResponse['remaining']>);
+    return res;
   },
 
   async startAsset(
@@ -264,8 +279,14 @@ export const AppApi = {
     asset_id: string;
     overlay: { bucket: string; key: string; put_url: string };
     video: { bucket: string; key: string; s3_upload_id: string };
+    remaining?: MeResponse['remaining'];
   }> {
-    return authFetch(endpoints.app.assetsStart, tokens, {
+    const res = await authFetch<{
+      asset_id: string;
+      overlay: { bucket: string; key: string; put_url: string };
+      video: { bucket: string; key: string; s3_upload_id: string };
+      remaining?: MeResponse['remaining'];
+    }>(endpoints.app.assetsStart, tokens, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -274,6 +295,8 @@ export const AppApi = {
         resolution: payload.resolution ?? 720,
       }),
     });
+    if (res.remaining && onRemainingUpdated) onRemainingUpdated(res.remaining as NonNullable<MeResponse['remaining']>);
+    return res;
   },
 
   async signMultipartPart(
