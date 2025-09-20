@@ -862,7 +862,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
             <AdsPlaceholder />
           )}
         </div>
-        <div className='flex flex-col w-full md:w-1/2 h-full min-h-0'>
+        <div className='flex flex-col w-full md:w-1/2 h-full min-h-0 pb-5'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
           <ScrollArea className="h-full py-2">
             <Accordion type="single" collapsible className="w-full mt-2 max-w-[95vw] mx-auto">
