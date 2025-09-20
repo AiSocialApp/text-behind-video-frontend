@@ -65,7 +65,6 @@ const Page = () => {
             entitlement: profile.entitlement,
             subscription_id: '',
         });
-        console.log(currentUser)
     };
 
     useEffect(() => {
@@ -73,7 +72,6 @@ const Page = () => {
         getCurrentUser();
       }
     }, [isAuthenticated, profile])
-    console.log(currentUser)
 
     return (
         <>

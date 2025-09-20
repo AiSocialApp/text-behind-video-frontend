@@ -125,7 +125,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     const rect = outerRef.current.getBoundingClientRect();
     const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 200));
     const scale = Math.min(
-      rect.width / imageNaturalSize.width,
+      (rect.width - 16) / imageNaturalSize.width,
       maxPreviewHeight / imageNaturalSize.height
     );
     const targetWidth = Math.max(1, Math.floor(imageNaturalSize.width * scale));
@@ -438,7 +438,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         onChange={handleFileChange}
         accept=".jpg, .jpeg, .png"
       />
-      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-11rem)] md:h-[calc(100vh-6rem)] px-2 md:px-10 mt-2'>
+      <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-[calc(100vh-11rem)] md:h-[calc(100vh-6rem)] px-2 md:px-10 mt-2 w-100vw'>
         <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div ref={outerRef} className='flex items-center gap-2 w-full'>
@@ -474,10 +474,10 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
             )}
           </div>
         </div>
-        <div className='flex flex-col w-full md:w-1/2 h-full min-h-0'>
+        <div className='flex flex-col w-full md:w-1/2 h-full'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
-          <ScrollArea className="h-full p-2">
-            <Accordion type="single" collapsible className="w-full mt-2">
+          <ScrollArea className="h-full py-2">
+            <Accordion type="single" collapsible className="w-full mt-2 max-w-[95vw] mx-auto">
               {textSets.map(textSet => (
                 <TextCustomizer
                   key={textSet.id}

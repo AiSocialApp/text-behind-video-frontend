@@ -92,6 +92,11 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const isPro = useMemo(() => profile?.entitlement === 'pro', [profile]);
   const userId = profile?.username ?? '';
 
+  // Preview readiness flags
+  const [isPosterReady, setIsPosterReady] = useState<boolean>(false);
+  const [isFgReady, setIsFgReady] = useState<boolean>(true);
+  const isPreviewReady = isPosterReady && isFgReady;
+
   const canGenerate = useMemo(() => {
     const hasUnlimited = remainingVideos === null;
     const hasRemaining = (remainingVideos ?? 0) > 0;
@@ -164,10 +169,11 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!outerRef.current || naturalSize.width === 0 || naturalSize.height === 0) return;
     const rect = outerRef.current.getBoundingClientRect();
     const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 220));
-    const scale = Math.min((rect.width - 16) / naturalSize.width, maxPreviewHeight / naturalSize.height);
+    const usableWidth = Math.max(0, Math.floor(rect.width - 16));
+    const scale = Math.min(usableWidth / naturalSize.width, maxPreviewHeight / naturalSize.height);
     const targetWidth = Math.max(1, Math.floor(naturalSize.width * scale));
     const targetHeight = Math.max(1, Math.floor(naturalSize.height * scale));
-    debugLog('updatePreviewScale', { rectWidth: rect.width, rectHeight: rect.height, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
+    debugLog('updatePreviewScale', { rectWidth: rect.width, rectHeight: rect.height, usableWidth, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
     setDisplayedSize({ width: targetWidth, height: targetHeight });
   };
 
@@ -178,6 +184,12 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     requestAnimationFrame(() => updatePreviewScale());
     return () => window.removeEventListener('resize', onResize);
   }, [naturalSize.width, naturalSize.height]);
+
+
+  // Reset poster readiness only when poster changes
+  useEffect(() => {
+    if (posterUrl) setIsPosterReady(false);
+  }, [posterUrl]);
 
   // Draw background layer (poster)
   useEffect(() => {
@@ -212,8 +224,11 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         debugLog('BG draw complete', { canvasWidth: canvas.width, canvasHeight: canvas.height });
+        setIsPosterReady(true);
       } catch (err) {
         console.warn('[TBV] Failed to load or decode background image', err);
+        // Avoid indefinite loading state on background errors
+        setIsPosterReady(true);
       }
     })();
   }, [posterUrl, displayedSize.width, displayedSize.height]);
@@ -256,17 +271,34 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!removedFgUrl) {
       removedFgImageRef.current = null;
       debugLog('FG cleared (no removedFgUrl)');
+      // No FG to load; treat as ready so preview is not blocked
+      setIsFgReady(true);
       return;
     }
     debugLog('FG draw start', { removedFgUrl, canvasWidth: canvas.width, canvasHeight: canvas.height });
     const img = new (window as any).Image();
     img.crossOrigin = 'anonymous';
+    setIsFgReady(false);
+    const timeoutId = window.setTimeout(() => {
+      debugLog('FG draw timeout; proceeding without FG');
+      setIsFgReady(true);
+    }, 5000);
     img.onload = () => {
+      clearTimeout(timeoutId);
       removedFgImageRef.current = img;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       debugLog('FG draw complete');
+      setIsFgReady(true);
+    };
+    img.onerror = (e: any) => {
+      clearTimeout(timeoutId);
+      debugLog('FG draw error', e);
+      setIsFgReady(true);
     };
     img.src = removedFgUrl;
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [removedFgUrl, displayedSize.width, displayedSize.height]);
 
   const drawTextSets = async (
@@ -382,6 +414,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 
   const drawOverlayCanvas = async () => {
     if (!overlayCanvasRef.current) return null;
+    debugLog('drawOverlayCanvas start');
     const canvas = overlayCanvasRef.current;
     const width = naturalSize.width || 0;
     const height = naturalSize.height || 0;
@@ -396,6 +429,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     // Wait for text drawing to complete
     await drawTextSets(ctx, width, height, scaleForFont);
 
+    debugLog('drawOverlayCanvas complete');
     return canvas;
   };
 
@@ -420,6 +454,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     setRemovedFgUrl(null);
     setTextSets([]);
     setIsReady(false);
+    setIsPosterReady(false);
+    setIsFgReady(false);
 
     // Use a local reference to detect if the file changed mid-processing
     const localFile = file;
@@ -457,6 +493,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
         console.warn('[TBV] Background removal failed', e);
         setRemovedFgUrl(null);
         removedFgImageRef.current = null;
+        // Proceed with preview without FG
+        setIsFgReady(true);
       }
     } catch (err) {
       console.error('[TBV] extractPosterAndDuration error', err);
@@ -488,6 +526,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
             const poster = canvas.toDataURL('image/png');
             cleanup();
             debugLog('poster captured');
+            // Mark poster as ready as soon as we have the data URL
+            setIsPosterReady(true);
             resolve({ poster, width, height, duration });
           } catch (e) {
             cleanup();
@@ -756,9 +796,9 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               </div>
             )}
           </div>
-          <div ref={outerRef} className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
-            {!isReady || !posterUrl ? (
-              <span className='flex items-center w-full gap-2 p-2'>{selectedVideo ? 'Preparing preview…' : 'Upload a video to get started'}</span>
+          <div ref={outerRef} className="min-h-[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
+            {!selectedVideo ? (
+              <span className='flex items-center w-full gap-2 p-2'>Upload a video to get started</span>
             ) : (
               <div style={{ position: 'relative', width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}>
                 <canvas
@@ -779,6 +819,14 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                   height={displayedSize.height}
                   style={{ width: `${displayedSize.width}px`, height: `${displayedSize.height}px`, position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'none' }}
                 />
+                {!isPreviewReady && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
+                    <span className='flex items-center gap-2 px-2 py-1 rounded-md'>
+                      <ReloadIcon className="h-4 w-4 animate-spin" />
+                      Preview is Loading…
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
