@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AppApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { removeBackground } from '@imgly/background-removal';
+import { Badge } from '../ui/badge';
 
 const MIN_PART_SIZE_MB = 8;
 
@@ -92,6 +93,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const remainingVideos = useMemo(() => profile?.remaining?.video ?? null, [profile]);
   const isPaid = useMemo(() => (profile ? profile.entitlement !== 'free' : false), [profile]);
   const isPro = useMemo(() => profile?.entitlement === 'pro', [profile]);
+  const isStarter = useMemo(() => profile?.entitlement === 'starter', [profile]);
   const userId = profile?.username ?? '';
 
   // Preview readiness flags
@@ -99,13 +101,32 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const [isFgReady, setIsFgReady] = useState<boolean>(true);
   const isPreviewReady = isPosterReady && isFgReady;
 
+  const multiplier = useMemo(() => {
+    if (selectedResolution <= 720) {
+      return 1
+    } else if (selectedResolution <= 1080) {
+      return 2
+    } else if (selectedResolution <= 1440) {
+      return 3
+    } else {
+      return 4
+    }
+  }, [selectedResolution])
+
+  const generationSeconds = useMemo(() => {
+    if (!multiplier || !videoDurationSec) {
+      return 0
+    } 
+    return multiplier * videoDurationSec
+  }, [multiplier, videoDurationSec])
+
   const canGenerate = useMemo(() => {
     const hasUnlimited = remainingVideos === null;
     const hasRemaining = (remainingVideos ?? 0) > 0;
     // Also ensure remaining is sufficient for the full video length when limited
-    const hasEnoughSeconds = hasUnlimited || ((remainingVideos ?? 0) >= Math.max(0, Math.round(videoDurationSec)));
+    const hasEnoughSeconds = hasUnlimited || ((remainingVideos ?? 0) >= Math.max(0, Math.round(generationSeconds)));
     return Boolean(tokens.accessToken && selectedVideo && isReady && (hasUnlimited || hasRemaining) && hasEnoughSeconds && !isGenerating);
-  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating, videoDurationSec]);
+  }, [tokens.accessToken, selectedVideo, isReady, remainingVideos, isGenerating, generationSeconds]);
 
   const [canSelect1080, canSelect1440, canSelect2160] = useMemo(() => {
 
@@ -127,10 +148,12 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   }, [naturalSize, selectedResolution, selectedVideo]);
 
   useEffect(() => {
-    if (!isPro && selectedResolution > 720) {
-      setSelectedResolution(720);
+    if (!isStarter && !isPro  && selectedResolution > 720) {
+      setSelectedResolution(720)
+    } else if (!isPro && selectedResolution > 1080) {
+      setSelectedResolution(1080);
     }
-  }, [isPro, selectedResolution]);
+  }, [isPro, isStarter, selectedResolution]);
 
 
   const resolutionLimitMsg = useMemo(() => {
@@ -212,7 +235,6 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
       window.removeEventListener('orientationchange', onOrientationChange);
     };
   }, [naturalSize.width, naturalSize.height]);
-
 
   // Reset poster readiness only when poster changes
   useEffect(() => {
@@ -646,7 +668,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
     if (!tokens.accessToken || !selectedVideo) return;
     const hasUnlimited = remainingVideos === null;
     const remaining = remainingVideos ?? 0;
-    const needed = Math.max(0, Math.round(videoDurationSec));
+    const needed = Math.max(0, Math.round(generationSeconds));
     if (!hasUnlimited && remaining <= 0) {
       toast({ title: 'Limit reached', description: 'You have no video seconds remaining.' });
       return;
@@ -751,8 +773,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               />
               720p
             </label>
-            {isPro ? (
-              <>
+            {isPro || isStarter ? (
                 <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect1080 ? 'text-muted-foreground opacity-60' : ''}`}>
                   <input
                     type="radio"
@@ -764,6 +785,9 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                   />
                   1080p
                 </label>
+            ): null}
+            {isPro ? (
+              <>
                 <label className={`flex items-center gap-1 text-sm sm:text-base ${!canSelect1440 ? 'text-muted-foreground opacity-60' : ''}`}>
                   <input
                     type="radio"
@@ -787,7 +811,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                   4K
                 </label>
               </>
-            ) : (
+            ) : null} 
+            {!isStarter && !isPro ? (
               <div className="flex items-center gap-2 sm:gap-4 rounded-md border border-border bg-muted/40 pl-1 py-0 text-sm sm:text-base sm:pl-2">
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
@@ -805,21 +830,47 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                 </div>
                 <Button size="xs" onClick={openPayDialog}>Upgrade</Button>
               </div>
-            )}
+            ): null}
+            {isStarter && !isPro ? (
+              <div className="flex items-center gap-2 sm:gap-4 rounded-md border border-border bg-muted/40 pl-1 py-0 text-sm sm:text-base sm:pl-2">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
+                    <input type="radio" name="resolution" value="1440" disabled />
+                    1440p
+                  </label>
+                  <label className="flex items-center gap-1 text-muted-foreground opacity-60 cursor-not-allowed">
+                    <input type="radio" name="resolution" value="2160" disabled />
+                    4K
+                  </label>
+                </div>
+                <Button size="xs" onClick={openPayDialog}>Upgrade</Button>
+              </div>
+            ): null}
+            {generationSeconds > 0 &&
+              <span className='flex justify-center align-center text-xs text-muted-foreground ml-auto hidden md:block'>  
+                {multiplier} x {videoDurationSec}s = {videoDurationSec * multiplier} video seconds
+                </span>
+            }
           </div>
           {resolutionLimitMsg && (
             <p className="text-sm text-muted-foreground">
               {resolutionLimitMsg}
             </p>
           )}
+
           {/* resolution selection ends */}
           <div className='block md:hidden'>
             {(remainingVideos === null) ? (
               <p className='text-sm'>Unlimited video seconds</p>
             ) : (
               <div className='flex items-center gap-5'>
-                <p className='text-sm'>
-                  {remainingVideos} video seconds left
+                {generationSeconds > 0 &&
+                  <span className='flex justify-center align-center text-xs text-muted-foreground'>  
+                    {multiplier} x {videoDurationSec}s = {videoDurationSec * multiplier} video seconds
+                    </span>
+                }
+                <p className='text-xs'>
+                  {remainingVideos} seconds remaining
                 </p>
               </div>
             )}
@@ -858,9 +909,6 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
               </div>
             )}
           </div>
-          {profile && profile.entitlement === 'starter' && (
-            <AdsPlaceholder />
-          )}
         </div>
         <div className='flex flex-col w-full md:w-1/2 h-full min-h-0 pb-5'>
           <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>

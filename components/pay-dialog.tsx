@@ -281,11 +281,11 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                 <ul className="mt-7 space-y-2.5 text-sm">
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">2 free generations / account</span>
+                    <span className="text-muted-foreground">30 seconds of video generation / account *</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">30 seconds of video generation / account</span>
+                    <span className="text-muted-foreground">2 free image generations / account</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
@@ -338,7 +338,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">600 seconds of video generation / 30 days</span>
+                    <span className="text-muted-foreground">1000 seconds of video generation / 30 days *</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
@@ -350,7 +350,7 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Limited to 720p</span>
+                    <span className="text-muted-foreground">Limited to 1080p</span>
                   </li>
                 </ul>
               </CardContent>
@@ -406,11 +406,11 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">3000 seconds of video generation / 30 days</span>
+                    <span className="text-muted-foreground">10 000 seconds of video generation / 30 days *</span>
                   </li>
                   <li className="flex space-x-2">
                     <Check className="flex-shrink-0 mt-0.5 h-4 w-4" />
-                    <span className="text-muted-foreground">Output in 1080p, 1440p & 4K</span>
+                    <span className="text-muted-foreground">Output up to 4K</span>
                   </li>
                 </ul>
               </CardContent>
@@ -460,6 +460,32 @@ const PayDialog: React.FC<PayDialogProps> = ({ userDetails, userEmail, isOpen, o
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+      <DialogFooter>
+        <div className="w-full">
+          <p className="w-full text-center text-sm text-muted-foreground mb-2 mt-3">
+            * These multipliers apply to video generation
+          </p>
+          <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5">
+              <span className="text-sm font-medium mr-1">720p</span>
+              <Badge className="text-xs">1x</Badge>
+            </div>
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5">
+              <span className="text-sm font-medium mr-1">1080p</span>
+              <Badge className="text-xs">2x</Badge>
+            </div>
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5">
+              <span className="text-sm font-medium mr-1">1440p</span>
+              <Badge className="text-xs">3x</Badge>
+            </div>
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5">
+              <span className="text-sm font-medium mr-1">4K</span>
+              <Badge className="text-xs">4x</Badge>
+            </div>
+          </div>
+        </div>
+      </DialogFooter>
       </DialogContent>
     </Dialog>
   )
