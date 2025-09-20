@@ -50,6 +50,8 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const removedBgImageRef = useRef<HTMLImageElement | null>(null);
   const outerRef = useRef<HTMLDivElement>(null);
+  const initialUsableWidthRef = useRef<number | null>(null);
+  const initialMaxPreviewHeightRef = useRef<number | null>(null);
 
   // We'll replicate logic for user entitlements:
   const remainingImages = useMemo(() => profile?.remaining?.image ?? null, [profile]);
@@ -122,9 +124,18 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
 
   const updatePreviewScale = () => {
     if (!outerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
-    const rect = outerRef.current.getBoundingClientRect();
-    const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 200));
-    const usableWidth = Math.max(1, Math.floor(rect.width - 16));
+
+    // Initialize baseline constraints once (at normal zoom)
+    if (initialUsableWidthRef.current === null || initialMaxPreviewHeightRef.current === null) {
+      const vv = (window as any).visualViewport as VisualViewport | undefined;
+      const baseHeight = Math.max(1, Math.floor(((vv?.height ?? window.innerHeight) || 0) - 200));
+      const baseWidth = Math.max(1, Math.floor((outerRef.current.clientWidth || 0) - 16));
+      initialUsableWidthRef.current = baseWidth;
+      initialMaxPreviewHeightRef.current = baseHeight;
+    }
+
+    const usableWidth = initialUsableWidthRef.current as number;
+    const maxPreviewHeight = initialMaxPreviewHeightRef.current as number;
     const scale = Math.min(
       usableWidth / imageNaturalSize.width,
       maxPreviewHeight / imageNaturalSize.height
@@ -135,12 +146,27 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
   };
 
   useEffect(() => {
-    const onResize = () => updatePreviewScale();
+    const onResize = () => {
+      const vv = (window as any).visualViewport as VisualViewport | undefined;
+      const scale = vv?.scale ?? 1;
+      // Ignore resizes caused by pinch-zoom; keep preview size stable
+      if (Math.abs(scale - 1) > 0.01) return;
+      updatePreviewScale();
+    };
+    const onOrientationChange = () => {
+      // Recompute baselines on true orientation changes
+      initialUsableWidthRef.current = null;
+      initialMaxPreviewHeightRef.current = null;
+      requestAnimationFrame(() => updatePreviewScale());
+    };
+
     window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientationChange);
     // Defer initial scale until after layout for more accurate bounds
     requestAnimationFrame(() => updatePreviewScale());
     return () => {
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientationChange);
     };
   }, [imageNaturalSize.width, imageNaturalSize.height]);
 
@@ -468,9 +494,9 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
             </div>
           <div className="min-h-[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!selectedImage ? (
-              <span className='flex items-center w-full gap-2 p-2'>Upload an image to get started</span>
+              <span className='absolute inset-0 flex items-center justify-center gap-2 p-2 text-center'>Upload an image to get started</span>
             ) : !isImageSetupDone ? (
-              <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
+              <span className='absolute inset-0 flex items-center justify-center gap-2 p-2 text-center'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
             ) : (
               <canvas
                 ref={previewCanvasRef}

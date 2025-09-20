@@ -78,6 +78,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
   const [selectedResolution, setSelectedResolution] = useState<number>(720);
 
   const outerRef = useRef<HTMLDivElement>(null);
+  const initialUsableWidthRef = useRef<number | null>(null);
+  const initialMaxPreviewHeightRef = useRef<number | null>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const fgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -167,22 +169,48 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
 
   const updatePreviewScale = () => {
     if (!outerRef.current || naturalSize.width === 0 || naturalSize.height === 0) return;
-    const rect = outerRef.current.getBoundingClientRect();
-    const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 220));
-    const usableWidth = Math.max(0, Math.floor(rect.width - 16));
+
+    // Initialize baseline constraints once (at normal zoom)
+    if (initialUsableWidthRef.current === null || initialMaxPreviewHeightRef.current === null) {
+      const vv = (window as any).visualViewport as VisualViewport | undefined;
+      const baseHeight = Math.max(1, Math.floor(((vv?.height ?? window.innerHeight) || 0) - 220));
+      const baseWidth = Math.max(0, Math.floor((outerRef.current.clientWidth || 0) - 16));
+      initialUsableWidthRef.current = baseWidth;
+      initialMaxPreviewHeightRef.current = baseHeight;
+    }
+
+    const usableWidth = initialUsableWidthRef.current as number;
+    const maxPreviewHeight = initialMaxPreviewHeightRef.current as number;
     const scale = Math.min(usableWidth / naturalSize.width, maxPreviewHeight / naturalSize.height);
     const targetWidth = Math.max(1, Math.floor(naturalSize.width * scale));
     const targetHeight = Math.max(1, Math.floor(naturalSize.height * scale));
-    debugLog('updatePreviewScale', { rectWidth: rect.width, rectHeight: rect.height, usableWidth, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
+    debugLog('updatePreviewScale', { usableWidth, maxPreviewHeight, scale, targetWidth, targetHeight, naturalSize });
     setDisplayedSize({ width: targetWidth, height: targetHeight });
   };
 
   useEffect(() => {
-    const onResize = () => updatePreviewScale();
+    const onResize = () => {
+      const vv = (window as any).visualViewport as VisualViewport | undefined;
+      const scale = vv?.scale ?? 1;
+      // Ignore pinch-zoom resizes; keep preview size stable
+      if (Math.abs(scale - 1) > 0.01) return;
+      updatePreviewScale();
+    };
+    const onOrientationChange = () => {
+      // Recompute baselines on true orientation changes
+      initialUsableWidthRef.current = null;
+      initialMaxPreviewHeightRef.current = null;
+      requestAnimationFrame(() => updatePreviewScale());
+    };
+
     window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientationChange);
     // Defer initial scale until container is laid out
     requestAnimationFrame(() => updatePreviewScale());
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientationChange);
+    };
   }, [naturalSize.width, naturalSize.height]);
 
 
@@ -798,7 +826,7 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
           </div>
           <div ref={outerRef} className="min-h-[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!selectedVideo ? (
-              <span className='flex items-center w-full gap-2 p-2'>Upload a video to get started</span>
+              <span className='absolute inset-0 flex items-center justify-center gap-2 p-2 text-center'>Upload a video to get started</span>
             ) : (
               <div style={{ position: 'relative', width: `${displayedSize.width}px`, height: `${displayedSize.height}px` }}>
                 <canvas
@@ -821,8 +849,8 @@ const VideoEditorView: React.FC<VideoEditorViewProps> = ({
                 />
                 {!isPreviewReady && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
-                    <span className='flex items-center gap-2 px-2 py-1 rounded-md'>
-                      <ReloadIcon className="h-4 w-4 animate-spin" />
+                    <span className='flex items-center justify-center gap-2 px-2 py-1 rounded-md text-center'>
+                      <ReloadIcon className="h-6 w-6 animate-spin mr-3" />
                       Preview is Loading…
                     </span>
                   </div>
