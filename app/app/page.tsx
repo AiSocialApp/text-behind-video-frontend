@@ -52,6 +52,31 @@ const Page = () => {
     const [videoIsUploading, setVideoIsUploading] = useState<boolean>(false);
     const [videoTextSets, setVideoTextSets] = useState<any[]>([]);
 
+    const resetState = async () => {
+        setCurrentUser(undefined)
+        setIsPayDialogOpen(false); 
+        setIsPlanDialogOpen(false);
+        setIsModelWarningVisible(true);
+        setActiveView('video');
+        setIsMobileSidebarOpen(false);
+        setImageSelectedImage(null);
+        setImageIsSetupDone(false);
+        setImageRemovedBgImageUrl(null);
+        setImageTextSets([]);
+        setImageNaturalSize({ width: 0, height: 0 });
+        setImageDisplayedSize({ width: 0, height: 0 });
+        setVideoSelectedVideo(null);
+        setVideoPosterUrl(null);
+        setVideoDurationSec(0);
+        setVideoRemovedFgUrl(null);
+        setVideoNaturalSize({ width: 0, height: 0 });
+        setVideoDisplayedSize({ width: 0, height: 0 });
+        setVideoIsReady(false);
+        setVideoIsGenerating(false);
+        setVideoIsUploading(false);
+        setVideoTextSets([]);
+    }
+
     const getCurrentUser = async () => {
         if (!profile) return;
         // Map MeResponse to local Profile shape; minimal fields used here
@@ -164,7 +189,10 @@ const Page = () => {
                                     <DropdownMenuItem onClick={() => setIsPayDialogOpen(true)}>
                                         <button>{currentUser?.paid ? 'View Plan' : 'Upgrade to Pro'}</button>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => logout()}>
+                                    <DropdownMenuItem onClick={() => {
+                                        logout()
+                                        resetState()
+                                    }}>
                                         <button>Log out</button>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
