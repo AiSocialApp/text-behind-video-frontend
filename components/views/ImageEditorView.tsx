@@ -124,8 +124,9 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     if (!outerRef.current || imageNaturalSize.width === 0 || imageNaturalSize.height === 0) return;
     const rect = outerRef.current.getBoundingClientRect();
     const maxPreviewHeight = Math.max(1, Math.floor((window.innerHeight || 0) - 200));
+    const usableWidth = Math.max(1, Math.floor(rect.width - 16));
     const scale = Math.min(
-      (rect.width - 16) / imageNaturalSize.width,
+      usableWidth / imageNaturalSize.width,
       maxPreviewHeight / imageNaturalSize.height
     );
     const targetWidth = Math.max(1, Math.floor(imageNaturalSize.width * scale));
@@ -136,7 +137,8 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
   useEffect(() => {
     const onResize = () => updatePreviewScale();
     window.addEventListener('resize', onResize);
-    updatePreviewScale();
+    // Defer initial scale until after layout for more accurate bounds
+    requestAnimationFrame(() => updatePreviewScale());
     return () => {
       window.removeEventListener('resize', onResize);
     };
@@ -291,6 +293,11 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
     canvas.width = Math.max(1, Math.floor(targetWidth));
     canvas.height = Math.max(1, Math.floor(targetHeight));
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Improve downscaling quality
+    ctx.imageSmoothingEnabled = true;
+    // Use the highest quality available; browsers map this appropriately
+    // @ts-ignore - extended smoothingQuality exists in modern browsers
+    ctx.imageSmoothingQuality = 'high';
 
     // Background
     if (bgImageRef.current) {
@@ -459,7 +466,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
                 </div>
               )}
             </div>
-          <div className="min-h:[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
+          <div className="min-h-[400px] w-full border border-border rounded-lg relative overflow-hidden flex items-center justify-center">
             {!selectedImage ? (
               <span className='flex items-center w-full gap-2 p-2'>Upload an image to get started</span>
             ) : !isImageSetupDone ? (
