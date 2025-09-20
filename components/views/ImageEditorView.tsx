@@ -375,6 +375,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
       const link = document.createElement('a');
       link.download = 'text-behind-image.png';
       link.href = dataUrl;
+      link.target = "_blank";
       link.click();
 
       // Also upload to S3
@@ -418,7 +419,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({
         throw new Error('Image upload failed');
       }
 
-      toast({ title: 'Image saved', description: 'Successfully uploaded image to your assets.' });
+      toast({ title: 'Image saved', description: 'Image saved to your library.' });
     } catch (err) {
       console.error(err);
       toast({ title: 'Error saving image', description: 'Could not save image.' });
